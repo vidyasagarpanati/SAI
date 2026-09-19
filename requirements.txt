@@ -5,7 +5,7 @@ mediapipe==0.10.21
 # site-packages/cv2 directory, and on Windows the mismatched native DLLs make
 # `from mediapipe.tasks.python import vision` fail with
 #   ImportError: DLL load failed while importing _framework_bindings
-opencv-contrib-python==4.10.0.84
+opencv-contrib-python==4.11.0.86
 numpy==1.26.4
 pandas==2.2.3
 pyarrow==17.0.0
