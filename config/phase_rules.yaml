@@ -1,0 +1,52 @@
+# Deterministic shot and phase segmentation thresholds.
+# All distances are normalised by shoulder width (landmark 11 to 12) so they are
+# scale invariant and camera-distance independent.
+# Tune these against a known video, then never touch them again: they are part of
+# the reproducibility contract.
+
+version: 1
+
+shot_detection:
+  # A shot cycle is bounded by two consecutive "bow down" resting states.
+  anchor_distance_enter: 0.45      # draw wrist within this of the face anchor point -> anchored
+  anchor_distance_exit: 0.70       # beyond this after anchor -> released
+  min_shot_duration_s: 2.0
+  min_rest_between_shots_s: 0.8
+  release_velocity_z: 3.0          # draw-wrist speed must exceed mean + z*SD to count as release
+
+phases:
+  # Ordered. Each rule names the signal and the condition that opens the phase.
+  stance:
+    opens_when: bow_arm_below_shoulder AND com_velocity_low
+    min_duration_s: 0.3
+  setup:
+    opens_when: bow_arm_rising
+    bow_arm_elevation_threshold_deg: 20
+  draw:
+    opens_when: anchor_distance_decreasing
+    min_decrease_rate_per_s: 0.15
+  anchor:
+    opens_when: anchor_distance_below_enter AND anchor_distance_stable
+    stability_window_s: 0.1
+    stability_tolerance: 0.03
+  aim:
+    opens_when: anchored AND com_velocity_low
+    com_velocity_threshold_norm_per_s: 0.05
+  expansion:
+    opens_when: anchored AND draw_elbow_angle_decreasing
+    min_decrease_deg_per_s: 2.0
+  release:
+    # single frame event plus a short window
+    window_before_s: 0.02
+    window_after_s: 0.05
+  follow_through:
+    duration_after_release_s: 0.6
+  recovery:
+    opens_when: bow_arm_dropping
+    duration_s: 1.0
+
+boundary_confidence:
+  # A boundary is HIGH if the driving signal crosses cleanly, MEDIUM if it
+  # oscillates within the hysteresis band, LOW if inferred from neighbours.
+  hysteresis_frames: 3
+  low_if_landmark_quality_below: 0.5

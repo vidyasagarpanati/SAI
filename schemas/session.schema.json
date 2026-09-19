@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Archery session metadata",
+  "type": "object",
+  "required": ["athlete_name", "bow_type", "draw_hand", "camera_view"],
+  "additionalProperties": false,
+  "properties": {
+    "athlete_name": {"type": "string", "minLength": 1},
+    "age": {"type": ["integer", "null"], "minimum": 5, "maximum": 100},
+    "gender": {"type": ["string", "null"], "enum": ["Male", "Female", "Other", null]},
+    "bow_type": {"type": "string", "enum": ["Recurve", "Compound", "Barebow", "Traditional"]},
+    "discipline": {"type": ["string", "null"]},
+    "draw_hand": {
+      "type": "string",
+      "enum": ["right", "left"],
+      "description": "Hand that draws the string. right = right-draw archer, bow held in the left hand."
+    },
+    "camera_view": {"type": "string", "minLength": 1},
+    "camera_distance_m": {"type": ["number", "null"], "exclusiveMinimum": 0},
+    "session_date": {"type": ["string", "null"], "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},
+    "declared_frame_rate": {
+      "type": ["number", "null"],
+      "description": "What the operator believes the capture rate was. The report always uses the MEASURED rate from S0 and flags any disagreement."
+    },
+    "number_of_shots_expected": {"type": ["integer", "null"], "minimum": 1},
+    "additional_data": {"type": "array", "items": {"type": "string"}},
+    "notes": {"type": ["string", "null"]},
+    "manual_phase_overrides": {
+      "type": ["object", "null"],
+      "description": "Optional escape hatch. Maps shot index to explicit phase boundaries in seconds. Overrides S4 rules and is recorded as such in the report."
+    },
+    "physio": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "heart_rate_file": {"type": ["string", "null"]},
+        "force_plate_file": {"type": ["string", "null"]}
+      }
+    }
+  }
+}

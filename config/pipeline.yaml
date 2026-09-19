@@ -1,0 +1,60 @@
+# Archery biomechanics pipeline configuration.
+# Every value here is part of the reproducibility hash. Change it and the run id changes.
+
+version: 1
+
+paths:
+  runs_dir: runs
+  outputs_dir: outputs
+  models_dir: models
+  pose_model_file: pose_landmarker_full.task   # MediaPipe "full" == model_complexity 1
+
+frames:
+  analysis_fps: 60          # decode target. Uses min(native_fps, analysis_fps).
+  jpeg_quality: 92
+  max_frames: 20000         # hard stop so a long video cannot fill the disk
+
+pose:
+  num_poses: 1
+  min_pose_detection_confidence: 0.5
+  min_pose_tracking_confidence: 0.5
+  min_pose_presence_confidence: 0.5
+  delegate: CPU             # GPU reserved for Ollama
+
+quality_gates:
+  landmark_track_confidence: 0.5      # track only at or above this
+  landmark_low_confidence_flag: 0.3   # below this -> DETECTED - LOW CONFIDENCE
+  angle_min_confidence: 0.4           # both proximal and distal must reach this
+  min_visible_landmarks: 20           # of 33, else INSUFFICIENT_LANDMARKS
+
+smoothing:
+  enabled: true
+  method: savgol            # savgol | none
+  window: 9                 # frames, must be odd
+  polyorder: 2
+
+stats:
+  min_shots_for_sd: 3       # below this, SD and CV are suppressed, not estimated
+
+llm:
+  base_url: http://localhost:11434
+  model: null               # set from ollama list, e.g. qwen2.5vl:7b
+  temperature: 0.0
+  seed: 20260919
+  top_p: 1.0
+  num_ctx: 8192
+  request_timeout_s: 300
+  max_retries_per_section: 2
+  send_key_frames_to_model: true
+  max_images_per_section: 2
+
+render:
+  embed_frames: true
+  jpeg_quality_embed: 85
+  max_embedded_frame_width: 1280
+
+video:
+  render_full_annotated: true
+  render_phase_clips: true
+  output_crf: 20
+  output_preset: medium

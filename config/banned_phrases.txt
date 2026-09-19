@@ -1,0 +1,21 @@
+# Section 10 must be non-diagnostic. Any match blocks publication.
+# One pattern per line, case insensitive, matched as a whole word sequence.
+diagnosis
+diagnosed
+diagnostic
+you have
+suffers from
+is suffering
+patient
+pathology
+tendinitis
+tendinopathy
+impingement syndrome
+rotator cuff tear
+labral tear
+herniated
+sprain
+strain injury
+requires treatment
+prescribe
+medical condition

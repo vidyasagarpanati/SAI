@@ -1,0 +1,40 @@
+{
+  "_README": [
+    "Section 7 of the master prompt forbids inventing benchmarks. This file is the ONLY",
+    "source of reference values the report may use. If a variable has no entry here, the",
+    "report renders 'Individualized assessment required' for it. Nothing is inferred.",
+    "",
+    "Every entry needs: value(s), units, population it applies to, evidence_class, and source.",
+    "evidence_class must be one of:",
+    "  literature          - a peer-reviewed study or federation technical manual, with citation",
+    "  coaching_convention - a widely taught coaching target, NOT an empirical distribution",
+    "  athlete_baseline    - computed from this athlete's own session, filled at runtime",
+    "",
+    "SHIPPED EMPTY ON PURPOSE. Populating this is a sports-science task, not a coding task.",
+    "Add entries only when you can name the source. An entry with source set to null is",
+    "rejected by the S9 verifier and will block report publication."
+  ],
+  "version": 1,
+  "updated": "2026-09-19",
+  "entries": [
+    {
+      "id": "BOW_ARM_EXTENSION_CONVENTION",
+      "variable": "bow_arm_elbow_angle_at_full_draw_deg",
+      "population": "Olympic recurve, all levels",
+      "target": null,
+      "range": null,
+      "units": "degrees",
+      "evidence_class": "coaching_convention",
+      "source": null,
+      "status": "NEEDS_SOURCE",
+      "note": "Placeholder. Fill target/range and source, or delete. Until then Section 7 renders 'Individualized assessment required' for this variable."
+    }
+  ],
+  "candidate_sources_to_review": [
+    "World Archery Coaching Manual, Level 2 and Level 3 (technical chapters)",
+    "Ertan H. et al., EMG and timing studies of the archery release",
+    "Simsek D. et al., postural stability and centre-of-pressure work in archers",
+    "Callaway A. et al., shot-cycle kinematics and performance in recurve archery",
+    "Spratford W. and Campbell R., shoulder and scapular mechanics in elite archery"
+  ]
+}

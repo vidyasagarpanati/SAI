@@ -1,0 +1,20 @@
+{
+  "athlete_name": "Kalpana",
+  "age": 19,
+  "gender": "Female",
+  "bow_type": "Recurve",
+  "discipline": "Olympic Recurve",
+  "draw_hand": "right",
+  "camera_view": "side-on (bow-arm side)",
+  "camera_distance_m": null,
+  "session_date": "2026-08-13",
+  "declared_frame_rate": null,
+  "number_of_shots_expected": null,
+  "additional_data": [],
+  "notes": "",
+  "manual_phase_overrides": null,
+  "physio": {
+    "heart_rate_file": null,
+    "force_plate_file": null
+  }
+}
