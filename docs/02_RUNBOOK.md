@@ -120,6 +120,14 @@ download it by hand to `models\pose_landmarker_full.task` from
 resolution and frame count but not codec or rotation. Install ffmpeg properly
 with `winget install Gyan.FFmpeg` and open a new PowerShell window.
 
+**S2 fails with `DLL load failed while importing _framework_bindings`.** Two
+OpenCV distributions are fighting over `site-packages\cv2`, or the Visual C++
+runtime is missing. Run `.\scripts\repair_opencv.ps1`, which removes every
+OpenCV package, deletes the leftover `cv2` directory, reinstalls only
+`opencv-contrib-python` (the one MediaPipe is built against), reinstalls
+MediaPipe and verifies the import. If it still fails,
+`winget install Microsoft.VCRedist.2015+.x64` and open a new PowerShell window.
+
 **A step fails its own checks.** Read `runs\<run_id>\checks_S<N>.json`. Every
 check records what it looked at. Fix the cause, then rerun that step with
 `--only S<N> --force`.

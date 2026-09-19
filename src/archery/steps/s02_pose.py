@@ -33,9 +33,41 @@ COLUMNS = ["frame", "t_ms", "lm", "x", "y", "z", "visibility", "presence",
            "wx", "wy", "wz"]
 
 
+MEDIAPIPE_DLL_HELP = """
+MediaPipe's native bindings failed to load.
+
+On Windows this is almost always one of two things:
+
+ 1. Clashing OpenCV installs. opencv-python, opencv-python-headless and
+    opencv-contrib-python all install into the same site-packages\\cv2
+    directory. MediaPipe is built against opencv-contrib-python, so any other
+    one installed on top leaves mismatched native DLLs behind.
+
+        .\\scripts\\repair_opencv.ps1
+
+ 2. Missing Visual C++ runtime.
+
+        winget install Microsoft.VCRedist.2015+.x64
+
+Then confirm with:
+
+        archery doctor
+
+Original error: {error}
+"""
+
+
+def _import_mediapipe():
+    try:
+        from mediapipe.tasks import python as mp_python
+        from mediapipe.tasks.python import vision
+        return mp_python, vision
+    except ImportError as exc:
+        raise ImportError(MEDIAPIPE_DLL_HELP.format(error=exc)) from exc
+
+
 def _build_landmarker(ctx: Context):
-    from mediapipe.tasks import python as mp_python
-    from mediapipe.tasks.python import vision
+    mp_python, vision = _import_mediapipe()
 
     model_path = ctx.cfg.paths.models_dir / ctx.cfg.get("paths.pose_model_file")
     if not model_path.is_file():
@@ -59,10 +91,11 @@ def _build_landmarker(ctx: Context):
 
 
 def run(ctx: Context) -> StepResult:
+    res = StepResult(step="S2")
+    _import_mediapipe()          # fail early with the remediation message
     import cv2
     import mediapipe as mp
 
-    res = StepResult(step="S2")
     frames_meta = ctx.read_json("01_frames.json")
     frames_dir = Path(frames_meta["frames_dir"])
     analysis_fps = float(frames_meta["analysis_fps"])

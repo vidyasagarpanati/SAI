@@ -78,13 +78,52 @@ def cmd_doctor(args) -> int:
     rows.append(("python", sys.version_info[:2] >= (3, 11) and sys.version_info[:2] < (3, 13),
                  f"{sys.version.split()[0]} (need 3.11 or 3.12 for mediapipe wheels)"))
 
-    for mod in ["cv2", "mediapipe", "numpy", "pandas", "pyarrow", "yaml",
+    for mod in ["cv2", "numpy", "pandas", "pyarrow", "yaml",
                 "jsonschema", "jinja2", "httpx", "langgraph"]:
         try:
             __import__(mod)
             rows.append((mod, True, "installed"))
         except Exception as exc:  # noqa: BLE001
             rows.append((mod, False, f"missing: {exc}"))
+
+    # Import exactly what S2 imports. A bare `import mediapipe` can succeed while
+    # the Tasks vision bindings fail to load, which is a false green.
+    try:
+        from mediapipe.tasks.python import vision  # noqa: F401
+        import mediapipe as _mp
+        rows.append(("mediapipe.tasks", True,
+                     f"vision bindings load (mediapipe {getattr(_mp, '__version__', '?')})"))
+    except Exception as exc:  # noqa: BLE001
+        hint = ""
+        if "DLL load failed" in str(exc):
+            hint = ("  ->  almost always a clashing OpenCV install or a missing "
+                    "Visual C++ runtime. See the opencv and vcruntime rows below.")
+        rows.append(("mediapipe.tasks", False, f"{type(exc).__name__}: {exc}{hint}"))
+
+    # Only one distribution may own site-packages/cv2.
+    try:
+        from importlib.metadata import distributions
+        opencv_pkgs = sorted({
+            d.metadata["Name"] for d in distributions()
+            if (d.metadata["Name"] or "").lower().startswith("opencv")
+        })
+        rows.append(("opencv packages", len(opencv_pkgs) == 1,
+                     f"{opencv_pkgs} (exactly one must be installed; mediapipe needs "
+                     f"opencv-contrib-python)" if opencv_pkgs != ["opencv-contrib-python"]
+                     else "opencv-contrib-python only, correct"))
+    except Exception as exc:  # noqa: BLE001
+        rows.append(("opencv packages", False, f"could not enumerate: {exc}"))
+
+    if sys.platform == "win32":
+        import ctypes
+        try:
+            ctypes.CDLL("vcruntime140_1.dll")
+            rows.append(("vcruntime", True, "Visual C++ 2015-2022 x64 runtime present"))
+        except OSError:
+            rows.append(("vcruntime", False,
+                         "vcruntime140_1.dll not loadable. Install the Microsoft Visual "
+                         "C++ 2015-2022 x64 redistributable: "
+                         "winget install Microsoft.VCRedist.2015+.x64"))
 
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:

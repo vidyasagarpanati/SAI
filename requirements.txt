@@ -1,6 +1,11 @@
 # Pinned for reproducibility. Windows 10/11, Python 3.11 or 3.12.
 mediapipe==0.10.21
-opencv-python-headless==4.10.0.84
+# IMPORTANT: mediapipe depends on opencv-contrib-python. Do NOT also install
+# opencv-python or opencv-python-headless. All three install into the same
+# site-packages/cv2 directory, and on Windows the mismatched native DLLs make
+# `from mediapipe.tasks.python import vision` fail with
+#   ImportError: DLL load failed while importing _framework_bindings
+opencv-contrib-python==4.10.0.84
 numpy==1.26.4
 pandas==2.2.3
 pyarrow==17.0.0
