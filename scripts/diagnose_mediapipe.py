@@ -21,6 +21,80 @@ def section(title: str) -> None:
     print(f"\n{LINE}\n{title}\n{LINE}")
 
 
+PROBE_A = """
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location('_fb', sys.argv[1])
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+print('PROBE_A OK: _framework_bindings loads with no cv2 in the process')
+"""
+
+PROBE_B = """
+import importlib.util, sys
+import cv2
+print('cv2', cv2.__version__, 'loaded first')
+spec = importlib.util.spec_from_file_location('_fb', sys.argv[1])
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+print('PROBE_B OK: _framework_bindings loads after cv2')
+"""
+
+PROBE_C = """
+from mediapipe.tasks.python import vision
+print('PROBE_C OK: full mediapipe.tasks.python.vision import')
+"""
+
+
+def _probe(name: str, code: str, pyd: str) -> tuple[bool, str]:
+    import subprocess
+    proc = subprocess.run([sys.executable, "-c", code, pyd],
+                          capture_output=True, text=True, timeout=180)
+    output = (proc.stdout + proc.stderr).strip()
+    ok = proc.returncode == 0
+    print(f"\n  [{name}] {'PASS' if ok else 'FAIL'}")
+    for line in output.splitlines()[-14:]:
+        print("     ", line)
+    return ok, output
+
+
+def isolation(pyd: Path) -> None:
+    section("ISOLATION PROBES (each in a fresh interpreter)")
+    print("  A: load _framework_bindings with NO cv2 in the process")
+    print("  B: import cv2 first, then load _framework_bindings")
+    print("  C: the normal import the pipeline performs")
+    a, _ = _probe("A", PROBE_A, str(pyd))
+    b, _ = _probe("B", PROBE_B, str(pyd))
+    c, _ = _probe("C", PROBE_C, str(pyd))
+
+    section("VERDICT")
+    try:
+        from importlib.metadata import version
+        cv_ver = version("opencv-contrib-python")
+    except Exception:
+        cv_ver = "unknown"
+    if c:
+        print("  Nothing is wrong in this interpreter. If the pipeline still fails,")
+        print("  it is running in a different venv. Check which python archery uses.")
+    elif a and not b:
+        print(f"  cv2 is the trigger. opencv-contrib-python {cv_ver} loads native DLLs that")
+        print("  conflict with MediaPipe's when both are in one process. MediaPipe imports")
+        print("  cv2 itself (mediapipe/__init__ -> solutions -> drawing_utils), so the import")
+        print("  order cannot be worked around in our code. The fix is the OpenCV version.")
+        print("")
+        print("  Try, in this order, stopping at the first that works:")
+        print("    .\\.venv\\Scripts\\python.exe -m pip install opencv-contrib-python==4.10.0.84")
+        print("    .\\.venv\\Scripts\\python.exe -m pip install opencv-contrib-python==4.9.0.80")
+        print("    .\\.venv\\Scripts\\python.exe -m pip install opencv-contrib-python==4.8.1.78")
+        print("  Re-run `archery diagnose` after each.")
+    elif not a:
+        print("  _framework_bindings cannot load even on its own, with no cv2 present.")
+        print("  This is a MediaPipe wheel or runtime problem, not an OpenCV clash.")
+        print("  Next step: try a different mediapipe build.")
+        print("    .\\.venv\\Scripts\\python.exe -m pip install --no-deps --force-reinstall mediapipe==0.10.18")
+    elif a and b and not c:
+        print("  The native bindings are fine. Something else in mediapipe's package")
+        print("  import chain is failing. The PROBE_C traceback above names it.")
+    print("")
+
+
 def main() -> int:
     section("INTERPRETER")
     print("executable :", sys.executable)
@@ -126,6 +200,19 @@ def main() -> int:
         if any(k in low for k in ("python", "venv", "ffmpeg", "cuda", "nvidia")):
             print("   ", entry)
 
+    section("OPENCV DETAIL")
+    try:
+        import cv2
+        print("  cv2 version :", cv2.__version__)
+        print("  cv2 file    :", cv2.__file__)
+        cv2_dir = Path(cv2.__file__).parent
+        dlls = sorted(cv2_dir.rglob("*.dll"))
+        print(f"  {len(dlls)} DLLs under {cv2_dir}")
+        for d in dlls[:12]:
+            print(f"    {d.name}  ({d.stat().st_size / 1e6:.1f} MB)")
+    except Exception as exc:
+        print("  cv2 not importable:", type(exc).__name__, exc)
+
     section("FULL TRACEBACK OF THE FAILING IMPORT")
     try:
         from mediapipe.tasks.python import vision  # noqa: F401
@@ -133,6 +220,9 @@ def main() -> int:
               "If the pipeline still fails, the venv it runs in differs from this one.")
     except Exception:
         traceback.print_exc()
+
+    if pyds:
+        isolation(pyds[0])
     return 0
 
 
