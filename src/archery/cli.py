@@ -234,6 +234,14 @@ def cmd_status(args) -> int:
     return 0
 
 
+def cmd_diagnose(args) -> int:
+    """Full native-dependency report. Paste the output when a DLL fails to load."""
+    import subprocess
+    cfg = _bootstrap(args.root)
+    script = cfg.root / "scripts" / "diagnose_mediapipe.py"
+    return subprocess.run([sys.executable, str(script)], cwd=cfg.root).returncode
+
+
 def cmd_selftest(args) -> int:
     """Run the synthetic-archer test suite. No video and no model needed."""
     import subprocess
@@ -278,6 +286,9 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("status", help="Show the state of a run.")
     s.add_argument("run_id", nargs="?")
     s.set_defaults(func=cmd_status)
+
+    g = sub.add_parser("diagnose", help="Full native-dependency report for DLL failures.")
+    g.set_defaults(func=cmd_diagnose)
 
     t = sub.add_parser("selftest", help="Run the synthetic-archer tests. No video needed.")
     t.set_defaults(func=cmd_selftest)
