@@ -195,6 +195,14 @@ def cmd_status(args) -> int:
     return 0
 
 
+def cmd_selftest(args) -> int:
+    """Run the synthetic-archer test suite. No video and no model needed."""
+    import subprocess
+    cfg = _bootstrap(args.root)
+    cmd = [sys.executable, "-m", "pytest", str(cfg.root / "tests"), "-q"]
+    return subprocess.run(cmd, cwd=cfg.root).returncode
+
+
 def cmd_steps(args) -> int:
     for s in STEP_ORDER:
         print(f"{s:<4} {STEP_NAMES[s]}")
@@ -231,6 +239,9 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("status", help="Show the state of a run.")
     s.add_argument("run_id", nargs="?")
     s.set_defaults(func=cmd_status)
+
+    t = sub.add_parser("selftest", help="Run the synthetic-archer tests. No video needed.")
+    t.set_defaults(func=cmd_selftest)
 
     l = sub.add_parser("steps", help="List the pipeline steps.")
     l.set_defaults(func=cmd_steps)

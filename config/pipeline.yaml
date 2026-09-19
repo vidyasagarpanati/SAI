@@ -38,7 +38,7 @@ stats:
 
 llm:
   base_url: http://localhost:11434
-  model: null               # set from ollama list, e.g. qwen2.5vl:7b
+  model: qwen3.6:35b        # from `ollama list` on the Windows box, 2026-09-19
   temperature: 0.0
   seed: 20260919
   top_p: 1.0
