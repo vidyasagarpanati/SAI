@@ -23,7 +23,7 @@ def section(title: str) -> None:
 
 PROBE_A = """
 import importlib.util, sys
-spec = importlib.util.spec_from_file_location('_fb', sys.argv[1])
+spec = importlib.util.spec_from_file_location('_framework_bindings', sys.argv[1])
 m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
 print('PROBE_A OK: _framework_bindings loads with no cv2 in the process')
 """
@@ -32,7 +32,7 @@ PROBE_B = """
 import importlib.util, sys
 import cv2
 print('cv2', cv2.__version__, 'loaded first')
-spec = importlib.util.spec_from_file_location('_fb', sys.argv[1])
+spec = importlib.util.spec_from_file_location('_framework_bindings', sys.argv[1])
 m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
 print('PROBE_B OK: _framework_bindings loads after cv2')
 """
@@ -71,8 +71,12 @@ def isolation(pyd: Path) -> None:
     except Exception:
         cv_ver = "unknown"
     if c:
-        print("  Nothing is wrong in this interpreter. If the pipeline still fails,")
-        print("  it is running in a different venv. Check which python archery uses.")
+        print("  MediaPipe imports correctly in this interpreter:", sys.executable)
+        print("  If the pipeline still fails, in order of likelihood:")
+        print("    1. The failing run predates the last install. Just run it again.")
+        print("    2. `archery` on PATH resolves to a different interpreter. Check with:")
+        print("         (Get-Command archery).Source")
+        print("       and compare against the executable above.")
     elif a and not b:
         print(f"  cv2 is the trigger. opencv-contrib-python {cv_ver} loads native DLLs that")
         print("  conflict with MediaPipe's when both are in one process. MediaPipe imports")
