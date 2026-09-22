@@ -163,10 +163,13 @@ def cmd_doctor(args) -> int:
 
     if getattr(args, "llm", False):
         # One tiny structured-output call through the same client S8 uses.
-        import tempfile
         from archery.llm import OllamaClient
         try:
-            client = OllamaClient(cfg, Path(tempfile.mkdtemp()))
+            # Cache inside runs/ so the write guard allows it (a system temp dir
+            # is outside the whitelist and is correctly refused).
+            probe_dir = io_guard.guarded_path(cfg.paths.runs_dir / "_doctor_llm")
+            probe_dir.mkdir(parents=True, exist_ok=True)
+            client = OllamaClient(cfg, probe_dir)
             caps = client.capabilities()
             rows.append(("model capabilities", True, ", ".join(sorted(caps)) or "none reported"))
             rows.append(("model vision", "vision" in caps,

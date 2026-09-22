@@ -43,3 +43,12 @@ def test_draw_hand_change_redoes_kinematics(tmp_path):
     a = compute_input_hash(_ctx(tmp_path, cfg, {"draw_hand": "right"}), "S3")
     b = compute_input_hash(_ctx(tmp_path, cfg, {"draw_hand": "left"}), "S3")
     assert a != b
+
+
+def test_doctor_llm_probe_writes_only_inside_the_whitelist():
+    """Regression: doctor --llm cached its probe in a system temp dir, which the
+    write guard refused on Windows. The probe cache must live under runs/."""
+    import ast
+    src = (ROOT / "src" / "archery" / "cli.py").read_text()
+    assert "tempfile" not in src, "cli.py must not write to system temp directories"
+    assert "_doctor_llm" in src
