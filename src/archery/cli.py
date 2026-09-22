@@ -86,19 +86,26 @@ def cmd_doctor(args) -> int:
         except Exception as exc:  # noqa: BLE001
             rows.append((mod, False, f"missing: {exc}"))
 
-    # Import exactly what S2 imports. A bare `import mediapipe` can succeed while
-    # the Tasks vision bindings fail to load, which is a false green.
-    try:
-        from mediapipe.tasks.python import vision  # noqa: F401
-        import mediapipe as _mp
-        rows.append(("mediapipe.tasks", True,
-                     f"vision bindings load (mediapipe {getattr(_mp, '__version__', '?')})"))
-    except Exception as exc:  # noqa: BLE001
-        hint = ""
-        if "DLL load failed" in str(exc):
-            hint = ("  ->  almost always a clashing OpenCV install or a missing "
-                    "Visual C++ runtime. See the opencv and vcruntime rows below.")
-        rows.append(("mediapipe.tasks", False, f"{type(exc).__name__}: {exc}{hint}"))
+    # MediaPipe runs in an isolated worker process (see archery/pose_worker.py),
+    # so test it exactly that way: a fresh interpreter, nothing else loaded.
+    import subprocess
+    probe = subprocess.run([sys.executable, "-m", "archery.pose_worker", "--selftest"],
+                           capture_output=True, text=True, timeout=180)
+    if probe.returncode == 0:
+        rows.append(("mediapipe worker", True, probe.stdout.strip().splitlines()[-1]))
+    else:
+        tail = (probe.stderr or probe.stdout).strip().splitlines()[-1:] or ["no output"]
+        rows.append(("mediapipe worker", False, tail[0]))
+
+    # Informational: does pyarrow-then-mediapipe fail on this machine? If so, the
+    # isolation above is what keeps the pipeline working.
+    clash = subprocess.run(
+        [sys.executable, "-c", "import pyarrow; from mediapipe.tasks.python import vision"],
+        capture_output=True, text=True, timeout=180)
+    rows.append(("pyarrow+mediapipe", True,
+                 "can share a process" if clash.returncode == 0 else
+                 "CONFLICT when loaded in one process (expected on some Windows builds; "
+                 "handled by running pose in an isolated worker)"))
 
     # Only one distribution may own site-packages/cv2.
     try:

@@ -120,6 +120,14 @@ download it by hand to `models\pose_landmarker_full.task` from
 resolution and frame count but not codec or rotation. Install ffmpeg properly
 with `winget install Gyan.FFmpeg` and open a new PowerShell window.
 
+**Why S2 runs MediaPipe in a separate process.** On this Windows box,
+MediaPipe's native bindings fail to initialise if pyarrow is already loaded in
+the same process (both bundle protobuf and abseil). pandas 2.x loads pyarrow
+eagerly, so S2 hands pose estimation to `archery.pose_worker`, a separate
+interpreter that loads only numpy, cv2 and mediapipe. `archery doctor` reports
+both the worker's health and whether the conflict exists on the machine. Check
+the worker on its own with `.\.venv\Scripts\python.exe -m archery.pose_worker --selftest`.
+
 **S2 fails with `DLL load failed while importing _framework_bindings`.** Two
 OpenCV distributions are fighting over `site-packages\cv2`, or the Visual C++
 runtime is missing. Run `.\scripts\repair_opencv.ps1`, which removes every
