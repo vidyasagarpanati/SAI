@@ -218,8 +218,13 @@ def run(ctx: Context) -> StepResult:
             t_entry.update({"mean_s": _r(arr.mean(), 3), "sd_s": _r(arr.std(ddof=1), 3),
                             "range_s": _r(arr.max() - arr.min(), 3),
                             "cv_pct": _r(100 * arr.std(ddof=1) / arr.mean(), 1) if arr.mean() > 0 else None})
-            for stat in ("mean_s", "sd_s", "range_s", "cv_pct"):
-                ev(f"all.{code}.duration.{stat}", t_entry[stat], "%" if stat == "cv_pct" else "s",
+            # Timing keys follow the same shape as every other measure:
+            # all.<PHASE>.duration_s.<stat>. (The model guessed this name before
+            # the rename, which is a sign the old one was the odd one out.)
+            for stat, suffix in (("mean_s", "mean"), ("sd_s", "sd"),
+                                 ("range_s", "range"), ("cv_pct", "cv_pct")):
+                ev(f"all.{code}.duration_s.{suffix}", t_entry[stat],
+                   "%" if stat == "cv_pct" else "s",
                    "HIGH" if len(durs) >= 5 else "MEDIUM", len(durs))
         else:
             t_entry["status"] = suppressed_reason or NOT_ASSESSABLE

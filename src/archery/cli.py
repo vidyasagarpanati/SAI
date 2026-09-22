@@ -242,12 +242,20 @@ def cmd_run(args) -> int:
     print(f"config : {cfg.config_hash}")
     print(f"steps  : {describe(steps)}\n")
 
+    import time as _t
+    run_started = _t.time()
+
+    def _summary():
+        print("\n" + state.render_table())
+        print(f"wall clock: {(_t.time() - run_started) / 60:.1f} min")
+
     if args.no_graph or args.only:
         for step_id in steps:
             try:
                 result = execute_step(ctx, step_id, force=args.force)
             except (StepFailed, UpstreamFailed) as exc:
                 print(f"\n{exc}")
+                _summary()
                 return 2
             except NotImplementedError as exc:
                 print(f"\n{exc}")
@@ -255,6 +263,7 @@ def cmd_run(args) -> int:
             print(result.summary())
             for c in result.warnings:
                 print(f"    [warn] {c.name}: {c.detail}")
+        _summary()
         print("\nDone.")
         return 0
 
@@ -263,7 +272,9 @@ def cmd_run(args) -> int:
         print(f"{step_id}: PASS")
     if final.get("failed"):
         print(f"\n{final['failed']} FAILED\n{final.get('error')}")
+        _summary()
         return 2
+    _summary()
     print("\nDone.")
     return 0
 

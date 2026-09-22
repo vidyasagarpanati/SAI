@@ -16,6 +16,10 @@ import re
 from typing import Any, Iterable
 
 PLACEHOLDER = re.compile(r"\{\{\s*([A-Za-z0-9_.\-]+)\s*\}\}")
+# Anything in braces, valid key or not. Needed so a malformed citation such as
+# {{s15_priorities.priorities[0].sets}} is caught here rather than surviving
+# into the rendered report as literal text.
+ANY_BRACED = re.compile(r"\{\{([^{}]*)\}\}")
 NUMBER = re.compile(r"(?<![\w.])-?\d+(?:\.\d+)?(?![\w])")
 REFERENCE_BEFORE = re.compile(
     r"(Section|Sections|Phase|Phases|Priority|Priorities|Shot|Shots|shot|shots|Top|#|Appendix|"
@@ -32,19 +36,30 @@ def keys_in(text: str) -> list[str]:
 
 
 def check_text(text: str, evidence: dict, *, prescriptive: bool = False) -> list[str]:
-    """Return a list of violations for one free-text field."""
+    """Violations for one field.
+
+    ``prescriptive`` fields (sets, repetitions, frequency, drills) exist to hold
+    training doses, so numbers are not checked there at all; placeholders still
+    are, because an unresolved one would reach the report.
+    """
     if not isinstance(text, str) or not text:
         return []
+    import difflib
     problems = []
-    for key in keys_in(text):
+    for raw in ANY_BRACED.findall(text):
+        key = raw.strip()
         if key in evidence:
             continue
+        near = difflib.get_close_matches(key, list(evidence), n=1, cutoff=0.6)
+        hint = f". Did you mean {{{{{near[0]}}}}}?" if near else ""
         if re.fullmatch(r"-?\d+(?:\.\d+)?", key):
             problems.append(f"{{{{{key}}}}} puts a NUMBER inside the braces. Put the evidence KEY "
                             f"(the text left of '=' in the EVIDENCE list) inside the braces instead")
         else:
-            problems.append(f"unknown evidence key {{{{{key}}}}}: copy a key exactly as written "
-                            f"in the EVIDENCE list")
+            problems.append(f"unknown evidence key {{{{{key}}}}}: only keys from the EVIDENCE list "
+                            f"of THIS section may be cited{hint}")
+    if prescriptive:
+        return problems
     stripped = PLACEHOLDER.sub(" ", text)
     stripped = SCALE.sub(" ", stripped)
     for m in NUMBER.finditer(stripped):

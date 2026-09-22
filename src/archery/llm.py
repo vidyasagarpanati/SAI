@@ -56,6 +56,7 @@ class OllamaClient:
         self.timeout = float(cfg.get("llm.request_timeout_s", 300))
         self._caps: set[str] | None = None
         self.usage = {"calls": 0, "cached": 0, "prompt_tokens": 0, "completion_tokens": 0, "seconds": 0.0}
+        self.last: dict = {}
 
     def capabilities(self) -> set[str]:
         if self._caps is None:
@@ -85,7 +86,10 @@ class OllamaClient:
         cache = self.cache_dir / f"{key[:32]}.json"
         if cache.is_file():
             self.usage["cached"] += 1
-            return json.loads(cache.read_text(encoding="utf-8"))["parsed"]
+            blob = json.loads(cache.read_text(encoding="utf-8"))
+            self.last = {"seconds": 0.0, "prompt_tokens": blob.get("prompt_tokens") or 0,
+                         "completion_tokens": blob.get("completion_tokens") or 0, "cached": True}
+            return blob["parsed"]
 
         msg = {"role": "user", "content": user}
         if images:
@@ -114,6 +118,8 @@ class OllamaClient:
                                f"reply {body.get('eval_count')} tokens. Start: {content[:160]!r}",
                                raw=content, done_reason=reason) from exc
         dt = time.time() - t0
+        self.last = {"seconds": round(dt, 1), "prompt_tokens": int(body.get("prompt_eval_count") or 0),
+                     "completion_tokens": int(body.get("eval_count") or 0), "cached": False}
         self.usage["calls"] += 1
         self.usage["prompt_tokens"] += int(body.get("prompt_eval_count") or 0)
         self.usage["completion_tokens"] += int(body.get("eval_count") or 0)
@@ -153,6 +159,8 @@ class FakeLLM:
         prior = re.findall(r'"id":"([SWE]\d+)"', user)
         self.calls.append(sid + (f"/{phase}" if phase else ""))
         self.usage["calls"] += 1
+        self.last = {"seconds": 0.0, "prompt_tokens": len(user) // 4,
+                     "completion_tokens": 200, "cached": False}
         self.last_user = user
         self.last_schema = schema
         if self.truncate_in and sid == self.truncate_in and not self._truncated:

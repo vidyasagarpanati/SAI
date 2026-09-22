@@ -290,7 +290,11 @@ PHASE_MEASURES = {
 }
 
 
-def evidence_lines(evidence: dict, keys: list[str]) -> str:
+def evidence_lines(evidence: dict, keys: list[str], max_lines: int = 90) -> str:
+    """The EVIDENCE block, capped. Keys arrive in priority order (this section's
+    own measures first, then keys cited by earlier sections), so the cap drops
+    the least relevant. An over-long block was what starved the reply of context
+    room on the first real run."""
     seen, lines = set(), []
     for k in keys:
         if k in evidence and k not in seen:
@@ -298,6 +302,10 @@ def evidence_lines(evidence: dict, keys: list[str]) -> str:
             e = evidence[k]
             conf = f" [{e['confidence']}]" if e.get("confidence") else ""
             lines.append(f"{{{{{k}}}}} = {format_value(e)}{conf}")
+        if len(lines) >= max_lines:
+            break
+    if len(lines) >= max_lines:
+        lines.append(f"(evidence list capped at {max_lines} entries; the most relevant are shown)")
     return "\n".join(lines) if lines else "(no measured evidence available for this section)"
 
 
@@ -332,7 +340,7 @@ def section_base_keys(sid: str, metrics: dict, detected: list[str]) -> list[str]
     if sid == "s05_biomech":
         return quality_keys(metrics) + phase_keys(metrics, "AIM") + phase_keys(metrics, "STANCE")
     if sid == "s06_consistency":
-        ks = [k for k in ev if k.startswith("all.") and (".duration." in k or any(
+        ks = [k for k in ev if k.startswith("all.") and (".duration_s." in k or any(
             f".{m}." in k for m in ("elbow_bow_deg", "elbow_draw_deg", "anchor_distance_norm",
                                     "trunk_inclination_deg")))]
         return ["session.n_shots"] + ks + [k for k in ev if k.endswith(".duration_s")]
@@ -344,13 +352,31 @@ def section_base_keys(sid: str, metrics: dict, detected: list[str]) -> list[str]
     return quality_keys(metrics)
 
 
-def digest(outputs: dict, deps: list[str]) -> tuple[str, list[str]]:
+def _shrink(val, max_chars: int):
+    """Earlier sections are passed on for consistency, not re-analysis: keep ids,
+    enums and headline text, drop evidence_keys and clip long prose."""
+    if isinstance(val, dict):
+        return {k: _shrink(v, max_chars) for k, v in val.items() if k != "evidence_keys"}
+    if isinstance(val, list):
+        return [_shrink(v, max_chars) for v in val]
+    if isinstance(val, str) and len(val) > max_chars:
+        return val[:max_chars].rsplit(" ", 1)[0] + " ..."
+    return val
+
+
+def digest(outputs: dict, deps: list[str], max_items: int = 4,
+           max_chars: int = 220) -> tuple[str, list[str]]:
     """Earlier sections as compact JSON, plus every evidence key they cite."""
     parts, keys = [], []
     for d in deps:
         val = outputs.get(d)
         if val is None:
             continue
+        if d == "s04_phase":
+            val = {ph: {"analysis": [a["point"] for a in o.get("analysis", [])[:max_items]],
+                        "coaching_implication": o.get("coaching_implication")}
+                   for ph, o in val.items()}
+        val = _shrink(val, max_chars)
         parts.append(f"### {d}\n{json.dumps(val, separators=(',', ':'), ensure_ascii=False)}")
         for _, s in walk_strings(val):
             keys += keys_in(s)
@@ -360,12 +386,16 @@ def digest(outputs: dict, deps: list[str]) -> tuple[str, list[str]]:
 
 
 def build_prompt(sid: str, cfg_prompts: dict, metrics: dict, outputs: dict, deps: list[str],
-                 detected: list[str], phase: str | None, has_images: bool) -> tuple[str, str, dict]:
+                 detected: list[str], phase: str | None, has_images: bool,
+                 limits: dict | None = None) -> tuple[str, str, dict]:
+    limits = limits or {}
     ev = metrics["evidence_index"]
     ctx = {"detected_phases": detected, "phase": phase, "ids": valid_ids(outputs)}
     base = phase_keys(metrics, phase) if sid == "s04_phase" else section_base_keys(sid, metrics, detected)
-    prior, prior_keys = digest(outputs, deps)
-    call_keys = [k for k in dict.fromkeys(base + prior_keys) if k in ev]
+    prior, prior_keys = digest(outputs, deps, max_items=int(limits.get("max_prior_points", 4)),
+                               max_chars=int(limits.get("max_prior_chars", 220)))
+    call_keys = [k for k in dict.fromkeys(base + prior_keys) if k in ev][
+        :int(limits.get("max_evidence_lines", 90))]
     ctx["evidence_keys"] = call_keys
     rules = cfg_prompts["sections"][sid]
     system = cfg_prompts["system"]
@@ -395,7 +425,8 @@ def build_prompt(sid: str, cfg_prompts: dict, metrics: dict, outputs: dict, deps
         "INSTRUCTIONS\n" + rules.strip(),
         "CONTEXT\n" + json.dumps(brief, ensure_ascii=False),
         ("EARLIER SECTIONS (cite their ids; do not contradict them)\n" + prior) if prior else "",
-        "EVIDENCE (cite values ONLY as {{key}})\n" + evidence_lines(ev, call_keys),
+        "EVIDENCE (cite values ONLY as {{key}})\n"
+        + evidence_lines(ev, call_keys, int(limits.get("max_evidence_lines", 90))),
         ("IMAGE: the attached annotated key frame(s) may be used only for OBSERVED qualitative "
          "points (grip, string contact, finger relaxation, occlusion, visible equipment). Numbers "
          "printed on the image must still be cited by key." if has_images else

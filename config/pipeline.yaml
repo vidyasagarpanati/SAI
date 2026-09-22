@@ -53,6 +53,12 @@ llm:
   num_predict: 4096   # hard cap on reply tokens per section
   request_timeout_s: 300
   max_retries_per_section: 2
+  # Prompt budget. The first real run sent ~15.9k-token prompts into a 16k
+  # window, leaving no room for the reply. These caps keep prompts near 5-6k.
+  max_evidence_lines: 90      # EVIDENCE entries per call
+  max_prior_points: 4         # analysis points carried from each earlier phase
+  max_prior_chars: 220        # clip length for text carried from earlier sections
+  warn_prompt_tokens: 7000    # log a warning above this estimated prompt size
   send_key_frames_to_model: true   # only if the model reports the vision capability
   think: false                     # disable reasoning tokens on thinking models (Qwen3)
   max_images_per_section: 2

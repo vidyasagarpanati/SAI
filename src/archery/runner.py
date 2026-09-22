@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import importlib
+import time
 import traceback
 from pathlib import Path
 
@@ -28,6 +29,12 @@ def load_step(step_id: str):
                 f"(expected module {module_name})."
             ) from exc
         raise
+
+
+def _hms(seconds: float) -> str:
+    s = int(round(seconds))
+    return f"{s // 3600}h {s % 3600 // 60}m {s % 60}s" if s >= 3600 else (
+        f"{s // 60}m {s % 60:02d}s" if s >= 60 else f"{s}s")
 
 
 def _hash_files(paths) -> str:
@@ -113,15 +120,22 @@ def execute_step(ctx: Context, step_id: str, force: bool = False) -> StepResult:
 
     module = load_step(step_id)
     state.start(step_id, input_hash)
+    print(f"\n== {step_id} {STEP_NAMES[step_id]}: started", flush=True)
+    t0 = time.time()
     try:
         result: StepResult = module.run(ctx)
     except Exception:
         state.fail(step_id, traceback.format_exc(limit=8))
+        print(f"== {step_id} {STEP_NAMES[step_id]}: FAILED after {_hms(time.time() - t0)}", flush=True)
         raise
+    took = time.time() - t0
 
     result.outputs = {k: str(v) for k, v in result.outputs.items()}
     state.record(step_id)["output_hash"] = _hash_files(result.outputs.values())
+    state.record(step_id)["duration_s"] = round(took, 1)
     state.finish(step_id, result)
+    print(f"== {step_id} {STEP_NAMES[step_id]}: {'PASS' if result.passed else 'FAIL'} "
+          f"in {_hms(took)}", flush=True)
     dump_result(result, ctx.run_dir / f"checks_{step_id}.json")
 
     if not result.passed:

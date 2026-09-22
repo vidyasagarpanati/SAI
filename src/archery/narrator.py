@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import re
+import time as _time
 from pathlib import Path
 
 import cv2
@@ -49,6 +50,13 @@ class Narrator:
             llm = OllamaClient(ctx.cfg, self.dir / "cache")
         self.llm = llm
         self.max_retries = int(ctx.cfg.get("llm.max_retries_per_section", 2))
+        self.limits = {k: ctx.cfg.get(f"llm.{k}") for k in
+                       ("max_evidence_lines", "max_prior_points", "max_prior_chars")}
+        self.limits = {k: v for k, v in self.limits.items() if v is not None}
+        self.warn_tokens = int(ctx.cfg.get("llm.warn_prompt_tokens", 7000))
+        self.call_seconds: list[float] = []
+        self.total_calls = 0
+        self.done_calls = 0
         caps = llm.capabilities()
         self.vision = "vision" in caps and bool(ctx.cfg.get("llm.send_key_frames_to_model", True))
         seen = {p["phase"] for s in self.metrics["phase_timeline"] for p in s["phases"] if p["detected"]}
@@ -118,13 +126,25 @@ class Narrator:
                  extra_feedback: list[str] | None = None) -> tuple[dict, list[str], int]:
         feedback = list(extra_feedback or [])
         images = self._images([phase] if phase else img_phases)
+        label = sid + (f"/{phase}" if phase else "")
         out, problems = {}, ["not generated"]
         for attempt in range(self.max_retries + 1):
-            system, user, schema = build_prompt(sid, self.ctx.cfg.prompts, self.metrics, self.digest_view(),
-                                                deps, self.detected, phase, bool(images))
+            system, user, schema = build_prompt(
+                sid, self.ctx.cfg.prompts, self.metrics, self.digest_view(), deps,
+                self.detected, phase, bool(images), self.limits)
             if feedback:
                 user += ("\n\nYOUR PREVIOUS ANSWER WAS REJECTED. Fix exactly these problems and "
                          "change nothing else:\n- " + "\n- ".join(feedback[:15]))
+            est = len(system) + len(user)
+            self.done_calls += 1
+            head = (f"  S8 [{self.done_calls}/{self.total_calls or '?'}] {label}"
+                    f"{f' retry {attempt}' if attempt else ''} "
+                    f"prompt~{est // 4} tok{f', {len(images)} image(s)' if images else ''}")
+            print(head + " ...", flush=True)
+            if est // 4 > self.warn_tokens:
+                print(f"      warning: prompt is larger than llm.warn_prompt_tokens "
+                      f"({self.warn_tokens}); lower llm.max_evidence_lines", flush=True)
+            started = _time.time()
             try:
                 out = self.llm.chat_json(system, user, schema, images)
             except Exception as exc:  # noqa: BLE001  (LLMBadOutput and transport errors)
@@ -134,27 +154,51 @@ class Narrator:
                 problems = [f"your answer was {exc}. Answer again with the SAME JSON structure "
                             f"but shorter text fields and fewer list items, and close every "
                             f"bracket and quote."]
+                print(f"      rejected: reply was cut off or unparseable; asking again", flush=True)
                 self.log.append({"section": sid, "phase": phase, "attempt": attempt,
                                  "problems": problems, "images": len(images),
+                                 "prompt_chars": est, "seconds": round(_time.time() - started, 1),
                                  "done_reason": exc.done_reason})
                 feedback = problems
                 out = {}
                 continue
             # Link restated evidence values back to their keys (unambiguous only).
             subset = {k: self.ev[k] for k in EVIDENCE_LINE.findall(user) if k in self.ev}
+            stats = dict(getattr(self.llm, "last", {}) or {})
+            took = stats.get("seconds") or round(_time.time() - started, 1)
+            if not stats.get("cached"):
+                self.call_seconds.append(took)
+            print(f"      {'cached' if stats.get('cached') else f'{took:.0f}s'}, "
+                  f"{stats.get('prompt_tokens', 0)}+{stats.get('completion_tokens', 0)} tokens"
+                  f"{self._eta()}", flush=True)
             out = _normalise_keys(out)
             out, linked = grounding.link_object(out, subset, self.ev, SKIP_FIELDS, PRESCRIPTIVE)
             self.links += [f"{sid}{'/' + phase if phase else ''}: {x}" for x in linked]
             problems = self.check(sid, out, schema, phase)
+            if problems:
+                print(f"      rejected: {problems[0][:120]}", flush=True)
             self.log.append({"section": sid, "phase": phase, "attempt": attempt,
                              "auto_linked": linked[:30], "problems": problems[:20],
-                             "images": len(images)})
+                             "images": len(images), "prompt_chars": est,
+                             "prompt_tokens": stats.get("prompt_tokens"),
+                             "completion_tokens": stats.get("completion_tokens"),
+                             "seconds": took, "cached": bool(stats.get("cached"))})
             if any("typed outside" in p for p in problems):
                 problems = problems + [NUMBER_HINT]
             if not problems:
                 return out, [], attempt
             feedback = problems
         return out, problems, self.max_retries
+
+    def _eta(self) -> str:
+        if not self.call_seconds or not self.total_calls:
+            return ""
+        typical = sorted(self.call_seconds)[len(self.call_seconds) // 2]
+        left = max(0, self.total_calls - self.done_calls)
+        if not left:
+            return ""
+        secs = typical * left
+        return f", about {secs / 60:.0f} min left ({left} call(s))" if secs >= 90 else f", ~{secs:.0f}s left"
 
     def save(self, name: str, payload) -> Path:
         path = self.dir / f"{name}.json"
@@ -165,6 +209,11 @@ class Narrator:
     def run_all(self) -> dict:
         failed: dict[str, list[str]] = {}
         retries = 0
+        self.total_calls = len(CALLS) - 1 + len(self.detected)
+        started_all = _time.time()
+        print(f"  S8: {self.total_calls} model call(s) planned "
+              f"({len(self.detected)} phase sections + {len(CALLS) - 1} report sections), "
+              f"model {self.ctx.cfg.get('llm.model')}", flush=True)
         for sid, deps, img_phases in CALLS:
             if sid == "s04_phase":
                 per = {}
@@ -188,6 +237,12 @@ class Narrator:
         self.save("auto_links", self.links)
         usage = dict(getattr(self.llm, "usage", {}))
         usage["vision_used"] = self.vision
+        usage["wall_seconds"] = round(_time.time() - started_all, 1)
+        usage["median_call_seconds"] = (sorted(self.call_seconds)[len(self.call_seconds) // 2]
+                                        if self.call_seconds else 0)
+        print(f"  S8 finished in {usage['wall_seconds'] / 60:.1f} min "
+              f"({usage['calls']} calls, {usage['cached']} cached, "
+              f"{usage['prompt_tokens']}+{usage['completion_tokens']} tokens)", flush=True)
         self.save("usage", usage)
         return {"failed": failed, "retries": retries, "usage": usage, "auto_linked": len(self.links)}
 

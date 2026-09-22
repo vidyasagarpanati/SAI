@@ -114,16 +114,21 @@ class RunState:
         return True, ""
 
     def render_table(self) -> str:
+        total = sum(rec.get("duration_s") or 0 for rec in self.data["steps"].values())
         lines = [f"run_id: {self.data.get('run_id')}",
                  f"video : {self.data.get('video_path')}",
                  f"config: {self.data.get('config_hash')}",
                  "",
-                 f"{'step':<5} {'name':<12} {'status':<8} {'checks':<10} finished"]
+                 f"{'step':<5} {'name':<12} {'status':<8} {'checks':<8} {'took':>10}  finished"]
         for s in STEP_ORDER:
             rec = self.data["steps"].get(s, {})
             checks = rec.get("checks", [])
             ok = sum(1 for c in checks if c.get("ok"))
             cs = f"{ok}/{len(checks)}" if checks else "-"
+            d = rec.get("duration_s")
+            took = f"{d / 60:.1f} min" if d and d >= 60 else (f"{d:.0f}s" if d else "-")
             lines.append(f"{s:<5} {STEP_NAMES[s]:<12} {rec.get('status', PENDING):<8} "
-                         f"{cs:<10} {rec.get('finished') or ''}")
+                         f"{cs:<8} {took:>10}  {rec.get('finished') or ''}")
+        lines.append("")
+        lines.append(f"total measured time: {total / 60:.1f} min")
         return "\n".join(lines)
