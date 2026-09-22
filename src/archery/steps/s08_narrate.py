@@ -29,6 +29,9 @@ def run(ctx: Context) -> StepResult:
     res.check("all_sections_pass_self_checks", not summary["failed"],
               "All sections passed schema, grounding and section rules." if not summary["failed"] else
               "; ".join(f"{k}: {v[:3]}" for k, v in summary["failed"].items()))
+    res.check("restated_values_linked", summary["auto_linked"] == 0,
+              f"{summary['auto_linked']} restated evidence value(s) were linked back to their keys "
+              f"automatically; see 08_narrative/auto_links.json.", severity=WARN)
     res.check("few_retries", summary["retries"] <= 3,
               f"{summary['retries']} regeneration(s) were needed.", severity=WARN)
     res.outputs["narrative"] = str(nar.dir / "all_sections.json")
@@ -36,5 +39,5 @@ def run(ctx: Context) -> StepResult:
     res.stats = {"sections": len(nar.outputs), "calls": usage.get("calls"),
                  "cached": usage.get("cached"), "prompt_tokens": usage.get("prompt_tokens"),
                  "completion_tokens": usage.get("completion_tokens"),
-                 "retries": summary["retries"]}
+                 "retries": summary["retries"], "auto_linked": summary["auto_linked"]}
     return res

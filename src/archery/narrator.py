@@ -8,6 +8,7 @@ listed. Temperature is 0, so the feedback is what changes the answer.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import cv2
@@ -16,7 +17,12 @@ import jsonschema
 from archery import grounding
 from archery.io_guard import guarded_open, guarded_path
 from archery.phase_defs import ORDER
-from archery.report_spec import (CALLS, PRESCRIPTIVE, SKIP_FIELDS, build_prompt, local_checks)
+from archery.report_spec import (CALLS, PRESCRIPTIVE, SKIP_FIELDS, build_prompt, local_checks,
+                                 schema_for, valid_ids)
+
+EVIDENCE_LINE = re.compile(r"^\{\{([\w.\-]+)\}\} = ", re.M)
+NUMBER_HINT = ("Remove every typed number that is not a {{KEY}}: no thresholds, targets, "
+               "approximations or restated values. Cite the {{KEY}} instead, or drop the number.")
 
 
 class Narrator:
@@ -41,6 +47,7 @@ class Narrator:
                        if ln.strip() and not ln.startswith("#")] if banned_file.is_file() else []
         self.outputs: dict = {}
         self.log: list[dict] = []
+        self.links: list[str] = []
         self._frame_w = None
 
     # ------------------------------------------------------------ helpers
@@ -78,6 +85,10 @@ class Narrator:
                                  for ph, o in view["s04_phase"].items()}
         return view
 
+    def schema(self, sid: str, phase: str | None = None) -> dict:
+        return schema_for(sid, {"detected_phases": self.detected, "phase": phase,
+                                "ids": valid_ids(self.outputs)})
+
     def check(self, sid: str, out: dict, schema: dict, phase: str | None) -> list[str]:
         problems = []
         try:
@@ -104,9 +115,16 @@ class Narrator:
                 user += ("\n\nYOUR PREVIOUS ANSWER WAS REJECTED. Fix exactly these problems and "
                          "change nothing else:\n- " + "\n- ".join(feedback[:15]))
             out = self.llm.chat_json(system, user, schema, images)
+            # Link restated evidence values back to their keys (unambiguous only).
+            subset = {k: self.ev[k] for k in EVIDENCE_LINE.findall(user) if k in self.ev}
+            out, linked = grounding.link_object(out, subset, self.ev, SKIP_FIELDS, PRESCRIPTIVE)
+            self.links += [f"{sid}{'/' + phase if phase else ''}: {x}" for x in linked]
             problems = self.check(sid, out, schema, phase)
             self.log.append({"section": sid, "phase": phase, "attempt": attempt,
-                             "problems": problems[:20], "images": len(images)})
+                             "auto_linked": linked[:30], "problems": problems[:20],
+                             "images": len(images)})
+            if any("typed outside" in p for p in problems):
+                problems = problems + [NUMBER_HINT]
             if not problems:
                 return out, [], attempt
             feedback = problems
@@ -141,10 +159,11 @@ class Narrator:
             self.save(sid, out)
         self.save("all_sections", self.outputs)
         self.save("generation_log", self.log)
+        self.save("auto_links", self.links)
         usage = dict(getattr(self.llm, "usage", {}))
         usage["vision_used"] = self.vision
         self.save("usage", usage)
-        return {"failed": failed, "retries": retries, "usage": usage}
+        return {"failed": failed, "retries": retries, "usage": usage, "auto_linked": len(self.links)}
 
     def load_saved(self) -> None:
         self.outputs = json.loads((self.dir / "all_sections.json").read_text(encoding="utf-8"))

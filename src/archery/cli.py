@@ -182,8 +182,8 @@ def cmd_doctor(args) -> int:
             user = ("SECTION: doctor_probe\n\nINSTRUCTIONS\nWrite one sentence describing the bow "
                     "elbow and trunk at full draw, citing both values.\n\n"
                     "EVIDENCE (cite values ONLY as {{key}})\n"
-                    "shot1.AIM.elbow_bow_deg.mean = 168.5 deg [HIGH]\n"
-                    "shot1.AIM.trunk_inclination_deg.mean = 2.1 deg [HIGH]")
+                    "{{shot1.AIM.elbow_bow_deg.mean}} = 168.5 deg [HIGH]\n"
+                    "{{shot1.AIM.trunk_inclination_deg.mean}} = 2.1 deg [HIGH]")
             t0 = _t.time()
             out = client.chat_json(
                 cfg.prompts.get("system", "Reply with JSON only."), user,

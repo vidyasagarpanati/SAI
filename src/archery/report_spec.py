@@ -92,8 +92,29 @@ PRESCRIPTIVE = {"sets", "repetitions", "frequency", "progression", "technical_dr
                 "coaching_cue", "success_metric", "recommendation", "corrective_strategy"}
 
 
+def valid_ids(outputs: dict) -> dict[str, list[str]]:
+    """Ids defined by earlier sections. Reference fields are restricted to these
+    through schema enums, so the model cannot invent an id."""
+    return {
+        "strengths": [i["id"] for i in outputs.get("s13_strengths", {}).get("items", [])],
+        "weaknesses": [i["id"] for i in outputs.get("s14_weaknesses", {}).get("items", [])],
+        "errors": [e["id"] for e in outputs.get("s09_errors", {}).get("errors", [])],
+    }
+
+
+NOT_ESTABLISHED = "NOT ESTABLISHED"
+
+
+def _ref_enum(values: list[str]) -> dict:
+    return enum(list(dict.fromkeys(values + [NOT_ESTABLISHED])))
+
+
 def schema_for(sid: str, ctx: dict) -> dict:
     phases = ctx.get("detected_phases", ORDER)
+    ids = ctx.get("ids") or {"strengths": [], "weaknesses": [], "errors": []}
+    S_ENUM = _ref_enum(ids["strengths"])
+    WE_ENUM = _ref_enum(ids["weaknesses"] + ids["errors"])
+    E_ITEMS = arr(enum(ids["errors"])) if ids["errors"] else arr(STR, 0, 0)
     if sid == "s02_quality":
         return obj(camera_angle=STR, lighting=STR, athlete_visibility=STR, occlusion=STR,
                    motion_blur=STR, clothing_interference=STR, limitations=arr(STR, 1, 8))
@@ -143,9 +164,9 @@ def schema_for(sid: str, ctx: dict) -> dict:
     if sid == "s14_weaknesses":
         return obj(items=arr(obj(id=STR, rank=INT, weakness=STR, evidence=STR, likely_cause=STR,
                                  performance_consequence=STR, correction=STR, priority=enum(CONF),
-                                 confidence=enum(CONF), evidence_keys=KEYS, related_errors=arr(STR)), 0, 10))
+                                 confidence=enum(CONF), evidence_keys=KEYS, related_errors=E_ITEMS), 0, 10))
     if sid == "s15_priorities":
-        return obj(priorities=arr(obj(rank=INT, weakness_ref=STR, issue=STR, current_problem=STR,
+        return obj(priorities=arr(obj(rank=INT, weakness_ref=WE_ENUM, issue=STR, current_problem=STR,
                                       evidence=STR, timestamp_key=STR, shot_phase=enum(phases),
                                       why_it_matters=STR, biomechanical_consequence=STR,
                                       performance_consequence=STR, corrective_strategy=STR,
@@ -153,24 +174,24 @@ def schema_for(sid: str, ctx: dict) -> dict:
                                       progression=STR, success_metric=STR, confidence=enum(CONF)), 5, 5))
     if sid == "s16_training_coaching":
         rec = obj(purpose=STR, exercise=STR, sets=STR, repetitions=STR, frequency=STR,
-                  coaching_cue=STR, progression=STR, addresses=arr(STR, 1))
-        cp = obj(recommendation=STR, addresses=arr(STR, 1))
+                  coaching_cue=STR, progression=STR, addresses=arr(WE_ENUM, 1))
+        cp = obj(recommendation=STR, addresses=arr(WE_ENUM, 1))
         return obj(technical=arr(rec, 0, 8), strength_conditioning=arr(rec, 0, 8),
                    mental=arr(rec, 0, 6), warm_up=arr(rec, 0, 6),
                    immediate=arr(cp, 1, 6), short_term=arr(cp, 1, 6), long_term=arr(cp, 1, 6))
     if sid == "s18_projection_final":
-        ref_item = obj(text=STR, ref=STR)
+        s_item, w_item = obj(text=STR, ref=S_ENUM), obj(text=STR, ref=WE_ENUM)
         return obj(projection=arr(obj(aspect=enum(["Consistency", "Grouping", "Stability", "Repeatability",
                                                    "Movement efficiency"]),
                                       projection=STR, confidence=enum(CONF)), 5, 5),
-                   does_well=arr(ref_item, 3, 3), fix_first=arr(ref_item, 3, 3),
-                   single_correction=ref_item, key_cue=STR, final_assessment=STR)
+                   does_well=arr(s_item, 3, 3), fix_first=arr(w_item, 3, 3),
+                   single_correction=w_item, key_cue=STR, final_assessment=STR)
     if sid == "s01_executive":
-        ref_item = obj(text=STR, ref=STR)
-        return obj(technical_level=STR, strongest_characteristic=ref_item,
-                   most_important_weakness=ref_item, main_consistency_limitation=STR,
+        s_item, w_item = obj(text=STR, ref=S_ENUM), obj(text=STR, ref=WE_ENUM)
+        return obj(technical_level=STR, strongest_characteristic=s_item,
+                   most_important_weakness=w_item, main_consistency_limitation=STR,
                    main_biomechanical_limitation=STR, main_injury_risk_factor=STR,
-                   most_important_correction=ref_item, expected_improvement_opportunity=STR)
+                   most_important_correction=w_item, expected_improvement_opportunity=STR)
     raise KeyError(sid)
 
 
@@ -218,7 +239,7 @@ def evidence_lines(evidence: dict, keys: list[str]) -> str:
             seen.add(k)
             e = evidence[k]
             conf = f" [{e['confidence']}]" if e.get("confidence") else ""
-            lines.append(f"{k} = {format_value(e)}{conf}")
+            lines.append(f"{{{{{k}}}}} = {format_value(e)}{conf}")
     return "\n".join(lines) if lines else "(no measured evidence available for this section)"
 
 
@@ -283,7 +304,7 @@ def digest(outputs: dict, deps: list[str]) -> tuple[str, list[str]]:
 def build_prompt(sid: str, cfg_prompts: dict, metrics: dict, outputs: dict, deps: list[str],
                  detected: list[str], phase: str | None, has_images: bool) -> tuple[str, str, dict]:
     ev = metrics["evidence_index"]
-    ctx = {"detected_phases": detected, "phase": phase}
+    ctx = {"detected_phases": detected, "phase": phase, "ids": valid_ids(outputs)}
     base = phase_keys(metrics, phase) if sid == "s04_phase" else section_base_keys(sid, metrics, detected)
     prior, prior_keys = digest(outputs, deps)
     rules = cfg_prompts["sections"][sid]
@@ -307,6 +328,8 @@ def build_prompt(sid: str, cfg_prompts: dict, metrics: dict, outputs: dict, deps
         brief["phase"] = {"code": phase, "name": DISPLAY[phase], "shots_with_phase": detected_shots}
     if sid == "s06_consistency":
         brief["consistency_rankings"] = metrics["consistency_rankings"]
+    if any(i for i in ctx["ids"].values()):
+        brief["valid_ids"] = ctx["ids"]
     user = "\n\n".join(filter(None, [
         "\n".join(header),
         "INSTRUCTIONS\n" + rules.strip(),
@@ -417,9 +440,13 @@ def local_checks(sid: str, out: dict, detected: list[str], phase: str | None,
         WE = set(_ids(outputs.get("s14_weaknesses", {}).get("items", []))) | \
             set(_ids(outputs.get("s09_errors", {}).get("errors", [])))
         for i, d in enumerate(out["does_well"]):
+            if d["ref"] == NOT_ESTABLISHED and len(S) < 3:
+                continue
             if d["ref"] not in S:
                 v.append(f"does_well[{i}] ref {d['ref']} is not a strength id")
         for i, d in enumerate(out["fix_first"]):
+            if d["ref"] == NOT_ESTABLISHED and len(WE) < 3:
+                continue
             if d["ref"] not in WE:
                 v.append(f"fix_first[{i}] ref {d['ref']} is not a weakness/error id")
         if out["single_correction"]["ref"] not in WE:

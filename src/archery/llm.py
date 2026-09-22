@@ -130,7 +130,7 @@ class FakeLLM:
     def chat_json(self, system, user, schema, images=None) -> dict:
         sid = re.search(r"SECTION: (\w+)", user).group(1)
         phase = (re.search(r"PHASE: (\w+)", user) or [None, None])[1]
-        keys = re.findall(r"^([\w.\-]+) = ", user, flags=re.M)
+        keys = re.findall(r"^\{\{([\w.\-]+)\}\} = ", user, flags=re.M)
         ctxj = json.loads(re.search(r"CONTEXT\n(\{.*\})", user).group(1))
         prior = re.findall(r'"id":"([SWE]\d+)"', user)
         self.calls.append(sid + (f"/{phase}" if phase else ""))

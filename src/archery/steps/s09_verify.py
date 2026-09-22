@@ -29,7 +29,7 @@ def _section_problems(nar: Narrator) -> dict[str, list[str]]:
             if got != sorted(nar.detected):
                 probs["s04_phase"] = [f"phases analysed {got} != detected {sorted(nar.detected)}"]
             for ph, out in nar.outputs.get(sid, {}).items():
-                p = nar.check(sid, out, schema_for(sid, {"detected_phases": nar.detected, "phase": ph}), ph)
+                p = nar.check(sid, out, nar.schema(sid, ph), ph)
                 if p:
                     probs[f"s04_phase/{ph}"] = p
             continue
@@ -37,7 +37,7 @@ def _section_problems(nar: Narrator) -> dict[str, list[str]]:
         if out is None:
             probs[sid] = ["section missing"]
             continue
-        p = nar.check(sid, out, schema_for(sid, {"detected_phases": nar.detected}), None)
+        p = nar.check(sid, out, nar.schema(sid), None)
         if p:
             probs[sid] = p
     return probs
