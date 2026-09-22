@@ -176,18 +176,28 @@ def cmd_doctor(args) -> int:
                          "key frames will be sent" if "vision" in caps else
                          "no vision: image-dependent items will be NOT RELIABLY ASSESSABLE"))
             import time as _t
+            from archery.grounding import check_text, keys_in
+            fake_ev = {"shot1.AIM.elbow_bow_deg.mean": {"value": 168.5, "units": "deg"},
+                       "shot1.AIM.trunk_inclination_deg.mean": {"value": 2.1, "units": "deg"}}
+            user = ("SECTION: doctor_probe\n\nINSTRUCTIONS\nWrite one sentence describing the bow "
+                    "elbow and trunk at full draw, citing both values.\n\n"
+                    "EVIDENCE (cite values ONLY as {{key}})\n"
+                    "shot1.AIM.elbow_bow_deg.mean = 168.5 deg [HIGH]\n"
+                    "shot1.AIM.trunk_inclination_deg.mean = 2.1 deg [HIGH]")
             t0 = _t.time()
             out = client.chat_json(
-                "Reply with JSON only.",
-                "Return the evidence key shot1.AIM.elbow_bow_deg.mean wrapped in double braces "
-                "in the field 'text', and confidence HIGH.",
-                {"type": "object", "properties": {"text": {"type": "string"},
+                cfg.prompts.get("system", "Reply with JSON only."), user,
+                {"type": "object", "properties": {"sentence": {"type": "string"},
                  "confidence": {"type": "string", "enum": ["HIGH", "MEDIUM", "LOW"]}},
-                 "required": ["text", "confidence"], "additionalProperties": False})
-            ok = "{{shot1.AIM.elbow_bow_deg.mean}}" in out.get("text", "").replace(" ", "")
-            rows.append(("structured output", ok,
-                         f"{_t.time() - t0:.0f}s, {client.usage['prompt_tokens']}+{client.usage['completion_tokens']} "
-                         f"tokens, reply={out}"))
+                 "required": ["sentence", "confidence"], "additionalProperties": False})
+            sentence = out.get("sentence", "")
+            problems = check_text(sentence, fake_ev)
+            ok = not problems and len(keys_in(sentence)) >= 1
+            rows.append(("structured output", True,
+                         f"valid JSON in {_t.time() - t0:.0f}s "
+                         f"({client.usage['prompt_tokens']}+{client.usage['completion_tokens']} tokens)"))
+            rows.append(("evidence citation", ok,
+                         f"reply: {sentence!r}" + ("" if ok else f"  PROBLEMS: {problems or ['no placeholder used']}")))
         except Exception as exc:  # noqa: BLE001
             rows.append(("structured output", False, f"{type(exc).__name__}: {exc}"))
 

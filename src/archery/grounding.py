@@ -36,8 +36,14 @@ def check_text(text: str, evidence: dict, *, prescriptive: bool = False) -> list
         return []
     problems = []
     for key in keys_in(text):
-        if key not in evidence:
-            problems.append(f"unknown evidence key {{{{{key}}}}}")
+        if key in evidence:
+            continue
+        if re.fullmatch(r"-?\d+(?:\.\d+)?", key):
+            problems.append(f"{{{{{key}}}}} puts a NUMBER inside the braces. Put the evidence KEY "
+                            f"(the text left of '=' in the EVIDENCE list) inside the braces instead")
+        else:
+            problems.append(f"unknown evidence key {{{{{key}}}}}: copy a key exactly as written "
+                            f"in the EVIDENCE list")
     stripped = PLACEHOLDER.sub(" ", text)
     stripped = SCALE.sub(" ", stripped)
     for m in NUMBER.finditer(stripped):
