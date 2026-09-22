@@ -194,12 +194,23 @@ def run(ctx: Context) -> StepResult:
     reasons["anchor_distance_norm"] = r
     gated.append("anchor_distance_norm")
 
-    out["draw_wrist_speed_norm_s"] = G.speed(draw_wrist, dt) / np.nanmedian(shoulder_width)
-    out["bow_wrist_speed_norm_s"] = G.speed(bow_wrist, dt) / np.nanmedian(shoulder_width)
+    # Speeds are differentiated from SMOOTHED positions. Differencing raw landmark
+    # positions amplifies MediaPipe's frame-to-frame jitter and reports noise as
+    # movement (found by inspecting rendered frames: a held aim read ~1 SW/s).
+    sw_med = np.nanmedian(shoulder_width)
+    win_p = int(ctx.cfg.get("smoothing.window", 9))
+    ord_p = int(ctx.cfg.get("smoothing.polyorder", 2))
+
+    def smooth_xy(p: np.ndarray) -> np.ndarray:
+        return np.stack([G.smooth_nan(p[:, 0], win_p, ord_p),
+                         G.smooth_nan(p[:, 1], win_p, ord_p)], axis=1)
+
+    out["draw_wrist_speed_norm_s"] = G.speed(smooth_xy(draw_wrist), dt) / sw_med
+    out["bow_wrist_speed_norm_s"] = G.speed(smooth_xy(bow_wrist), dt) / sw_med
 
     out["com_x_norm"] = pelvis_mid[:, 0]
     out["com_y_norm"] = pelvis_mid[:, 1]
-    out["com_speed_norm_s"] = G.speed(pelvis_mid, dt) / np.nanmedian(shoulder_width)
+    out["com_speed_norm_s"] = G.speed(smooth_xy(pelvis_mid), dt) / sw_med
 
     u, r = _gate(vis, [ID["LEFT_HEEL"], ID["RIGHT_HEEL"], sh_l, sh_r], min_conf, frame_ok)
     out["stance_width_norm"] = np.where(
@@ -222,7 +233,8 @@ def run(ctx: Context) -> StepResult:
     smoothed_cols = []
     if smoothing and str(ctx.cfg.get("smoothing.method", "savgol")) == "savgol":
         for name in list(out.keys()):
-            if name in ("frame", "t_ms", "t_s", "n_visible_landmarks", "frame_usable"):
+            if name in ("frame", "t_ms", "t_s", "n_visible_landmarks", "frame_usable",
+                        "draw_wrist_speed_norm_s", "bow_wrist_speed_norm_s", "com_speed_norm_s"):
                 continue
             out[name] = G.smooth_nan(out[name], window, polyorder)
             smoothed_cols.append(name)

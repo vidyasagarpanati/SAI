@@ -11,9 +11,28 @@ from archery.context import Context
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def make_run(run_dir: Path, df, fps: float, session: dict | None = None) -> Context:
+def write_frames(run_dir: Path, n: int, size=(640, 360)) -> Path:
+    """Plain dark frames with a faint grid, so overlays are visible in tests."""
+    import cv2
+    import numpy as np
+    fdir = run_dir / "frames"
+    fdir.mkdir(parents=True, exist_ok=True)
+    w, h = size
+    base = np.full((h, w, 3), 48, np.uint8)
+    for x in range(0, w, 40):
+        cv2.line(base, (x, 0), (x, h), (60, 60, 60), 1)
+    for y in range(0, h, 40):
+        cv2.line(base, (0, y), (w, y), (60, 60, 60), 1)
+    for i in range(n):
+        cv2.imwrite(str(fdir / f"f{i:06d}.jpg"), base)
+    return fdir
+
+
+def make_run(run_dir: Path, df, fps: float, session: dict | None = None,
+             frames: tuple[int, int] | None = None, outputs_dir: Path | None = None) -> Context:
     run_dir.mkdir(parents=True, exist_ok=True)
-    io_guard.configure([run_dir])
+    roots = [run_dir] + ([outputs_dir] if outputs_dir else [])
+    io_guard.configure(roots)
     df.to_parquet(run_dir / "02_landmarks.parquet", index=False)
     n = int(df["frame"].max()) + 1
     (run_dir / "01_frames.json").write_text(json.dumps(
@@ -27,5 +46,10 @@ def make_run(run_dir: Path, df, fps: float, session: dict | None = None) -> Cont
         "measured_fps": fps, "session": sess,
         "probe": {"duration_s": n / fps, "width": 1920, "height": 1080,
                   "codec": "h264", "source": "synthetic"}}))
-    return Context(cfg=load_config(ROOT), run_id=run_dir.name, run_dir=run_dir,
+    if frames:
+        write_frames(run_dir, n, frames)
+    cfg = load_config(ROOT)
+    if outputs_dir:
+        cfg.paths.outputs_dir = outputs_dir
+    return Context(cfg=cfg, run_id=run_dir.name, run_dir=run_dir,
                    video_path=Path("synthetic.mov"), session=sess)

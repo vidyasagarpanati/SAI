@@ -235,7 +235,7 @@ Windows-specific implementation notes:
 | S0 ingest, S1 frames | done |
 | S2 pose (isolated worker), S3 kinematics | done |
 | S4 phases, S5 stats | done |
-| S6 annotate, S7 video | queued |
+| S6 annotate, S7 video | done |
 | S8 narrate, S9 verify, S10 render | queued |
 
 ### Change log (2026-09-22)
@@ -249,3 +249,15 @@ Windows-specific implementation notes:
 - phase_rules.yaml v2: every key is read by S4, nothing decorative.
 - Phase badges follow the master prompt: STANCE 1, PRE_DRAW 2, DRAW 3,
   ANCHOR 4, AIM 5, EXPANSION 6, RELEASE 7, FOLLOW_THROUGH 8, RECOVERY 9.
+
+### Change log (2026-09-23)
+
+- S6/S7 share one renderer (`overlay.py`), so key frames and video cannot disagree.
+  Side panel holds the measurement table, observation and coaching boxes, so text
+  never covers the athlete. The renderer reports every overlay it drew or skipped
+  with a reason; S6 fails if a required overlay is neither.
+- Weight distribution is labelled NOT ASSESSABLE FROM VIDEO (needs force data);
+  COM ground projection is labelled [INFERRED].
+- Fix found by visual inspection: speeds were differentiated from raw landmark
+  positions, so jitter read as motion (held aim ~1.16 SW/s). Now computed from
+  smoothed positions (~0.21 SW/s); regression test added.

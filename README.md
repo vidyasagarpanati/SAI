@@ -50,7 +50,8 @@ archery run --video "D:\archery\shot.mp4" --to S5
 |---|---|
 | S0 ingest, S1 frames, S2 pose, S3 kinematics | implemented, tested |
 | S4 phases, S5 stats (evidence file) | implemented, tested |
-| S6 to S10 | in progress |
+| S6 annotate, S7 annotated video | implemented, tested, visually checked |
+| S8 narrate, S9 verify, S10 render | next |
 
 `archery selftest` runs the whole S3 measurement layer against a synthetic
 archer with known geometry. No video, no model, about one second.

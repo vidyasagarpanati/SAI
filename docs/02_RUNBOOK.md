@@ -67,6 +67,21 @@ Thresholds live in `config/phase_rules.yaml`. Tune them from data, not by eye:
 A phase the signals cannot support is written as `detected: false` with a
 reason, never with a guessed boundary. `checks_S4.json` lists every one.
 
+## Annotated outputs (S6, S7)
+
+| Output | Where |
+|---|---|
+| One annotated key frame per detected phase | `runs\<run_id>\06_frames\shot<k>_p<badge>_<PHASE>.jpg` |
+| What each frame drew or skipped, and why | `runs\<run_id>\06_manifest.json` |
+| Full annotated video with live joint angles | `runs\<run_id>\07_video\annotated_full.mp4` |
+| One clip per phase | `runs\<run_id>\07_video\shot<k>_p<badge>_<PHASE>.mp4` |
+| Published copy, versioned, never overwritten | `outputs\<Athlete>_Annotated_<date>_vNN.mp4` |
+
+Numbers on key frames are the rounded values from `05_metrics.json`, so the
+images and the report agree exactly. The coaching box on key frames reads
+PENDING until S10 re-renders the frames with the verified narrative. Video
+rendering runs on CPU and prints progress; expect roughly real time or slower.
+
 ## Day-to-day commands
 
 | Need | Command |

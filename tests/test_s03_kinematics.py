@@ -103,3 +103,10 @@ def test_determinism(ctx):
     s03_kinematics.run(ctx)
     second = hashlib.sha256((ctx.run_dir / "03_kinematics.parquet").read_bytes()).hexdigest()
     assert first == second
+
+
+def test_held_aim_is_not_reported_as_movement(ctx, result):
+    """Speeds come from smoothed positions, so jitter during a held aim stays small."""
+    df = pd.read_parquet(ctx.run_dir / "03_kinematics.parquet")
+    held = df[(df["t_s"] >= 2.6) & (df["t_s"] <= 3.1)]["com_speed_norm_s"]
+    assert held.median() < 0.3, f"held-aim COM speed {held.median():.3f} SW/s is jitter, not motion"
