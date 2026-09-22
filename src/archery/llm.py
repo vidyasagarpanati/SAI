@@ -25,6 +25,14 @@ class LLMError(RuntimeError):
     pass
 
 
+class LLMBadOutput(LLMError):
+    """The model answered, but not with complete valid JSON (usually truncated).
+    Retryable: the narrator sends it back with a request to be more concise."""
+    def __init__(self, msg: str, raw: str = "", done_reason: str | None = None):
+        super().__init__(msg)
+        self.raw, self.done_reason = raw, done_reason
+
+
 def _parse_json(text: str) -> dict:
     text = re.sub(r"<think>.*?</think>", "", text or "", flags=re.S).strip()
     text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text).strip()
@@ -67,7 +75,8 @@ class OllamaClient:
         opts = {"temperature": float(self.cfg.get("llm.temperature", 0.0)),
                 "seed": int(self.cfg.get("llm.seed", 0)),
                 "top_p": float(self.cfg.get("llm.top_p", 1.0)),
-                "num_ctx": int(self.cfg.get("llm.num_ctx", 8192))}
+                "num_ctx": int(self.cfg.get("llm.num_ctx", 16384)),
+                "num_predict": int(self.cfg.get("llm.num_predict", 4096))}
         think = bool(self.cfg.get("llm.think", False))
         key = hashlib.sha256(json.dumps({
             "model": self.model, "opts": opts, "think": think, "system": system, "user": user,
@@ -94,10 +103,16 @@ class OllamaClient:
             raise LLMError(f"Ollama returned {r.status_code}: {r.text[:500]}")
         body = r.json()
         content = body.get("message", {}).get("content", "")
+        reason = body.get("done_reason")
         try:
             parsed = _parse_json(content)
         except Exception as exc:  # noqa: BLE001
-            raise LLMError(f"Model did not return valid JSON: {content[:300]}") from exc
+            self.usage["calls"] += 1
+            why = ("cut off at the output limit (num_predict)" if reason == "length"
+                   else f"not valid JSON (done_reason={reason})")
+            raise LLMBadOutput(f"Model reply {why}; prompt {body.get('prompt_eval_count')} tokens, "
+                               f"reply {body.get('eval_count')} tokens. Start: {content[:160]!r}",
+                               raw=content, done_reason=reason) from exc
         dt = time.time() - t0
         self.usage["calls"] += 1
         self.usage["prompt_tokens"] += int(body.get("prompt_eval_count") or 0)
@@ -117,8 +132,11 @@ class FakeLLM:
     """Deterministic, schema-valid sections built from the EVIDENCE keys in the
     prompt. ``fabricate`` injects a typed number once, to prove S8 catches it."""
 
-    def __init__(self, fabricate_in: str | None = None, vision: bool = True):
+    def __init__(self, fabricate_in: str | None = None, vision: bool = True,
+                 truncate_in: str | None = None):
         self.fabricate_in = fabricate_in
+        self.truncate_in = truncate_in
+        self._truncated = False
         self._fabricated = False
         self.vision = vision
         self.calls: list[str] = []
@@ -135,6 +153,12 @@ class FakeLLM:
         prior = re.findall(r'"id":"([SWE]\d+)"', user)
         self.calls.append(sid + (f"/{phase}" if phase else ""))
         self.usage["calls"] += 1
+        self.last_user = user
+        self.last_schema = schema
+        if self.truncate_in and sid == self.truncate_in and not self._truncated:
+            self._truncated = True
+            raise LLMBadOutput("cut off at the output limit (num_predict)",
+                               raw='{"phase": "STANCE", "analysis": [{"point": "Stance wid', done_reason="length")
         k = lambda i=0: keys[i % len(keys)] if keys else None  # noqa: E731
         cite = lambda i=0: (f"value {{{{{k(i)}}}}}" if k(i) else "NOT RELIABLY ASSESSABLE FROM AVAILABLE VIDEO")  # noqa: E731
         ek = lambda i=0: [k(i)] if k(i) else []  # noqa: E731

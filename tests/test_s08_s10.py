@@ -140,3 +140,43 @@ def test_no_vision_model_gets_no_images(tmp_path):
     assert any(c.name == "vision_available" and not c.ok for c in r8.checks)
     log = json.loads((ctx.narrative_dir / "generation_log.json").read_text())
     assert all(x["images"] == 0 for x in log)
+
+
+# ---------------------------------------------------------------- output format
+def test_every_prompt_carries_an_explicit_json_template(tmp_path):
+    ctx = _prepare(tmp_path, "fmt")
+    ctx.llm = FakeLLM()
+    assert s08_narrate.run(ctx).passed
+    user = ctx.llm.last_user
+    assert "OUTPUT FORMAT" in user and "Return ONE JSON object" in user
+    assert '"technical_level"' in user          # last call was s01_executive
+    assert "WITHOUT braces" in user
+
+
+def test_evidence_keys_are_restricted_to_the_calls_own_keys(tmp_path):
+    ctx = _prepare(tmp_path, "keys")
+    ctx.llm = FakeLLM()
+    assert s08_narrate.run(ctx).passed
+    import re as _re
+    listed = set(_re.findall(r"^\{\{([\w.\-]+)\}\} = ", ctx.llm.last_user, flags=_re.M))
+    sch = ctx.llm.last_schema
+    # s01_executive has no evidence_keys; check an earlier schema instead via spec
+    from archery.report_spec import schema_for
+    s = schema_for("s09_errors", {"detected_phases": ["AIM"], "evidence_keys": ["a.b", "c.d"]})
+    assert s["properties"]["errors"]["items"]["properties"]["evidence_keys"]["items"]["enum"] == ["a.b", "c.d"]
+
+
+def test_truncated_reply_is_retried_not_fatal(tmp_path):
+    ctx = _prepare(tmp_path, "trunc")
+    ctx.llm = FakeLLM(truncate_in="s05_biomech")
+    r8 = s08_narrate.run(ctx)
+    assert r8.passed, [f"{c.name}: {c.detail}" for c in r8.failures]
+    log = json.loads((ctx.narrative_dir / "generation_log.json").read_text())
+    cut = [x for x in log if x["section"] == "s05_biomech" and x.get("done_reason") == "length"]
+    assert cut and "shorter text fields" in cut[0]["problems"][0]
+
+
+def test_braced_evidence_keys_are_normalised():
+    from archery.narrator import _normalise_keys
+    out = _normalise_keys({"analysis": [{"evidence_keys": ["{{all.STANCE.stance_width_norm.mean}}", "`x.y`"]}]})
+    assert out["analysis"][0]["evidence_keys"] == ["all.STANCE.stance_width_norm.mean", "x.y"]

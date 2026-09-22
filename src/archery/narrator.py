@@ -25,6 +25,17 @@ NUMBER_HINT = ("Remove every typed number that is not a {{KEY}}: no thresholds, 
                "approximations or restated values. Cite the {{KEY}} instead, or drop the number.")
 
 
+def _normalise_keys(obj):
+    """Strip braces/backticks a model may put around evidence_keys entries."""
+    if isinstance(obj, dict):
+        return {k: ([re.sub(r"[{}`\s]", "", x) if isinstance(x, str) else x for x in v]
+                    if k == "evidence_keys" and isinstance(v, list) else _normalise_keys(v))
+                for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_normalise_keys(x) for x in obj]
+    return obj
+
+
 class Narrator:
     def __init__(self, ctx, llm=None):
         self.ctx = ctx
@@ -114,9 +125,24 @@ class Narrator:
             if feedback:
                 user += ("\n\nYOUR PREVIOUS ANSWER WAS REJECTED. Fix exactly these problems and "
                          "change nothing else:\n- " + "\n- ".join(feedback[:15]))
-            out = self.llm.chat_json(system, user, schema, images)
+            try:
+                out = self.llm.chat_json(system, user, schema, images)
+            except Exception as exc:  # noqa: BLE001  (LLMBadOutput and transport errors)
+                from archery.llm import LLMBadOutput
+                if not isinstance(exc, LLMBadOutput):
+                    raise
+                problems = [f"your answer was {exc}. Answer again with the SAME JSON structure "
+                            f"but shorter text fields and fewer list items, and close every "
+                            f"bracket and quote."]
+                self.log.append({"section": sid, "phase": phase, "attempt": attempt,
+                                 "problems": problems, "images": len(images),
+                                 "done_reason": exc.done_reason})
+                feedback = problems
+                out = {}
+                continue
             # Link restated evidence values back to their keys (unambiguous only).
             subset = {k: self.ev[k] for k in EVIDENCE_LINE.findall(user) if k in self.ev}
+            out = _normalise_keys(out)
             out, linked = grounding.link_object(out, subset, self.ev, SKIP_FIELDS, PRESCRIPTIVE)
             self.links += [f"{sid}{'/' + phase if phase else ''}: {x}" for x in linked]
             problems = self.check(sid, out, schema, phase)

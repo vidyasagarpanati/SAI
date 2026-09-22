@@ -49,7 +49,8 @@ llm:
   temperature: 0.0
   seed: 20260919
   top_p: 1.0
-  num_ctx: 8192
+  num_ctx: 16384      # prompt + images + reply must fit; raise if replies are cut off
+  num_predict: 4096   # hard cap on reply tokens per section
   request_timeout_s: 300
   max_retries_per_section: 2
   send_key_frames_to_model: true   # only if the model reports the vision capability

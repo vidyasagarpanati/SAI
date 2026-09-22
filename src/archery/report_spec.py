@@ -57,8 +57,9 @@ def report_order(placement: str) -> list[dict]:
 
 
 # ------------------------------------------------------------------ schema helpers
-STR = {"type": "string"}
+STR = {"type": "string", "maxLength": 900}      # guard against run-on fields
 INT = {"type": "integer"}
+KEY_STR = {"type": "string", "pattern": "^[A-Za-z0-9_.\\-]+$", "maxLength": 120}
 
 
 def enum(vals):
@@ -77,7 +78,7 @@ def obj(**props):
             "additionalProperties": False}
 
 
-KEYS = arr(STR)
+KEYS = arr(KEY_STR, 0, 6)
 SCORE = {"type": ["integer", "null"], "minimum": 0, "maximum": 10}
 POINT = obj(point=STR, evidence_level=enum(LEVELS), confidence=enum(CONF), evidence_keys=KEYS)
 
@@ -112,6 +113,11 @@ def _ref_enum(values: list[str]) -> dict:
 def schema_for(sid: str, ctx: dict) -> dict:
     phases = ctx.get("detected_phases", ORDER)
     ids = ctx.get("ids") or {"strengths": [], "weaknesses": [], "errors": []}
+    # evidence_keys may only name keys that were in this call's EVIDENCE list:
+    # a bare key, no braces. Enforced by Ollama's grammar through the enum.
+    call_keys = ctx.get("evidence_keys")
+    KEYS = arr(enum(call_keys), 0, 6) if call_keys else arr(KEY_STR, 0, 6)
+    POINT = obj(point=STR, evidence_level=enum(LEVELS), confidence=enum(CONF), evidence_keys=KEYS)
     S_ENUM = _ref_enum(ids["strengths"])
     WE_ENUM = _ref_enum(ids["weaknesses"] + ids["errors"])
     E_ITEMS = arr(enum(ids["errors"])) if ids["errors"] else arr(STR, 0, 0)
@@ -193,6 +199,58 @@ def schema_for(sid: str, ctx: dict) -> dict:
                    main_biomechanical_limitation=STR, main_injury_risk_factor=STR,
                    most_important_correction=w_item, expected_improvement_opportunity=STR)
     raise KeyError(sid)
+
+
+# ------------------------------------------------------------------ output template
+def _example(node: dict, depth: int = 0):
+    t = node.get("type")
+    if "enum" in node:
+        vals = node["enum"]
+        return vals[0] if len(vals) == 1 else " | ".join(map(str, vals[:12])) + (" | ..." if len(vals) > 12 else "")
+    if t == "object":
+        return {k: _example(v, depth + 1) for k, v in node["properties"].items()}
+    if t == "array":
+        return [_example(node["items"], depth + 1)]
+    if t == "integer" or t == ["integer", "null"]:
+        rng = f"{node.get('minimum', '')}-{node.get('maximum', '')}".strip("-")
+        return f"<integer{' ' + rng if rng else ''}{' or null' if isinstance(t, list) else ''}>"
+    if node.get("pattern"):
+        return "<evidence key, exactly as listed, WITHOUT braces>"
+    return "<text>"
+
+
+def _counts(node: dict, path: str = "") -> list[str]:
+    out = []
+    if node.get("type") == "object":
+        for k, v in node["properties"].items():
+            out += _counts(v, f"{path}.{k}" if path else k)
+    elif node.get("type") == "array":
+        mn, mx = node.get("minItems", 0), node.get("maxItems")
+        if mn == mx:
+            out.append(f"{path}: exactly {mn} item(s)")
+        elif mn or mx is not None:
+            out.append(f"{path}: {mn} to {mx if mx is not None else 'any'} items")
+        out += _counts(node["items"], f"{path}[]")
+    return out
+
+
+def output_format(schema: dict) -> str:
+    """Human-readable template of the required JSON, derived from the schema so
+    the two can never disagree."""
+    template = json.dumps(_example(schema), indent=1, ensure_ascii=False)
+    lines = [
+        "OUTPUT FORMAT",
+        "Return ONE JSON object with exactly these fields and nothing else. No markdown,",
+        "no comments, no text before or after it. Values separated by | are the only",
+        "allowed choices; pick one.",
+        template,
+        "Item counts:",
+        *[f"- {c}" for c in _counts(schema)],
+        "Be concise: one or two sentences per text field. In text fields cite values as",
+        "{{KEY}}. In evidence_keys arrays list bare keys WITHOUT braces, at most 6.",
+        "Finish the JSON completely; a cut-off answer is rejected.",
+    ]
+    return "\n".join(lines)
 
 
 # ------------------------------------------------------------------ call plan
@@ -307,6 +365,8 @@ def build_prompt(sid: str, cfg_prompts: dict, metrics: dict, outputs: dict, deps
     ctx = {"detected_phases": detected, "phase": phase, "ids": valid_ids(outputs)}
     base = phase_keys(metrics, phase) if sid == "s04_phase" else section_base_keys(sid, metrics, detected)
     prior, prior_keys = digest(outputs, deps)
+    call_keys = [k for k in dict.fromkeys(base + prior_keys) if k in ev]
+    ctx["evidence_keys"] = call_keys
     rules = cfg_prompts["sections"][sid]
     system = cfg_prompts["system"]
     if sid in USES_RUBRIC:
@@ -335,14 +395,16 @@ def build_prompt(sid: str, cfg_prompts: dict, metrics: dict, outputs: dict, deps
         "INSTRUCTIONS\n" + rules.strip(),
         "CONTEXT\n" + json.dumps(brief, ensure_ascii=False),
         ("EARLIER SECTIONS (cite their ids; do not contradict them)\n" + prior) if prior else "",
-        "EVIDENCE (cite values ONLY as {{key}})\n" + evidence_lines(ev, base + prior_keys),
+        "EVIDENCE (cite values ONLY as {{key}})\n" + evidence_lines(ev, call_keys),
         ("IMAGE: the attached annotated key frame(s) may be used only for OBSERVED qualitative "
          "points (grip, string contact, finger relaxation, occlusion, visible equipment). Numbers "
          "printed on the image must still be cited by key." if has_images else
          "NO IMAGE is available: anything that needs visual inspection is NOT RELIABLY ASSESSABLE "
          "FROM AVAILABLE VIDEO."),
     ]))
-    return system, user, schema_for(sid, ctx)
+    schema = schema_for(sid, ctx)
+    user += "\n\n" + output_format(schema)
+    return system, user, schema
 
 
 # ------------------------------------------------------------------ self-checks
