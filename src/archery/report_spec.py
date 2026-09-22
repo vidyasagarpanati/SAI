@@ -90,7 +90,8 @@ SKIP_FIELDS = {"evidence_level", "confidence", "severity", "classification", "ph
                "id", "ref", "weakness_ref", "priority", "evidence_keys", "addresses",
                "related_errors", "shot_phase", "timestamp_key"}
 PRESCRIPTIVE = {"sets", "repetitions", "frequency", "progression", "technical_drill", "exercise",
-                "coaching_cue", "success_metric", "recommendation", "corrective_strategy"}
+                "coaching_cue", "success_metric", "recommendation", "corrective_strategy",
+                "correction", "maintenance_strategy", "key_cue", "drill"}
 
 
 def valid_ids(outputs: dict) -> dict[str, list[str]]:
@@ -349,6 +350,8 @@ def section_base_keys(sid: str, metrics: dict, detected: list[str]) -> list[str]
                 if "elbow_bow" in k or "wrist_bow" in k or "draw_wrist_speed" in k]
     if sid in ("s09_errors", "s10_injury", "s11_framework"):
         return quality_keys(metrics) + phase_keys(metrics, "AIM")
+    if sid == "s01_executive":
+        return ["session.n_shots", "quality.pose_detection_rate_pct"]
     return quality_keys(metrics)
 
 
@@ -364,8 +367,8 @@ def _shrink(val, max_chars: int):
     return val
 
 
-def digest(outputs: dict, deps: list[str], max_items: int = 4,
-           max_chars: int = 220) -> tuple[str, list[str]]:
+def digest(outputs: dict, deps: list[str], max_items: int = 4, max_chars: int = 220,
+           max_section_chars: int = 2200) -> tuple[str, list[str]]:
     """Earlier sections as compact JSON, plus every evidence key they cite."""
     parts, keys = [], []
     for d in deps:
@@ -377,7 +380,10 @@ def digest(outputs: dict, deps: list[str], max_items: int = 4,
                         "coaching_implication": o.get("coaching_implication")}
                    for ph, o in val.items()}
         val = _shrink(val, max_chars)
-        parts.append(f"### {d}\n{json.dumps(val, separators=(',', ':'), ensure_ascii=False)}")
+        blob = json.dumps(val, separators=(",", ":"), ensure_ascii=False)
+        if len(blob) > max_section_chars:
+            blob = blob[:max_section_chars] + ' ..."(truncated)"}'
+        parts.append(f"### {d}\n{blob}")
         for _, s in walk_strings(val):
             keys += keys_in(s)
             if re.fullmatch(r"(shot\d+|all|session|quality|benchmark)\.[\w.\-]+", s):
@@ -393,7 +399,8 @@ def build_prompt(sid: str, cfg_prompts: dict, metrics: dict, outputs: dict, deps
     ctx = {"detected_phases": detected, "phase": phase, "ids": valid_ids(outputs)}
     base = phase_keys(metrics, phase) if sid == "s04_phase" else section_base_keys(sid, metrics, detected)
     prior, prior_keys = digest(outputs, deps, max_items=int(limits.get("max_prior_points", 4)),
-                               max_chars=int(limits.get("max_prior_chars", 220)))
+                               max_chars=int(limits.get("max_prior_chars", 220)),
+                               max_section_chars=int(limits.get("max_prior_section_chars", 2200)))
     call_keys = [k for k in dict.fromkeys(base + prior_keys) if k in ev][
         :int(limits.get("max_evidence_lines", 90))]
     ctx["evidence_keys"] = call_keys
@@ -412,10 +419,13 @@ def build_prompt(sid: str, cfg_prompts: dict, metrics: dict, outputs: dict, deps
                                        for p in s["phases"] if not p["detected"]}),
         "cross_shot_status": metrics["cross_shot"].get("status") or "available",
     }
+    required_rows = ""
     if phase:
         detected_shots = [s["shot"] for s in metrics["phase_timeline"]
                           for p in s["phases"] if p["phase"] == phase and p["detected"]]
         brief["phase"] = {"code": phase, "name": DISPLAY[phase], "shots_with_phase": detected_shots}
+        required_rows = ("REQUIRED: frame_rows must contain exactly one entry for EACH of these "
+                         f"shot numbers, no more and no fewer: {detected_shots}")
     if sid == "s06_consistency":
         brief["consistency_rankings"] = metrics["consistency_rankings"]
     if any(i for i in ctx["ids"].values()):
@@ -435,6 +445,8 @@ def build_prompt(sid: str, cfg_prompts: dict, metrics: dict, outputs: dict, deps
     ]))
     schema = schema_for(sid, ctx)
     user += "\n\n" + output_format(schema)
+    if required_rows:
+        user += "\n" + required_rows
     return system, user, schema
 
 

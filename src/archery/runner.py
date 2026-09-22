@@ -60,22 +60,58 @@ def _hash_files(paths) -> str:
 #   config  : config slices (see Config.slice_hash)
 #   session : session.json fields this step reads
 STEP_DEPS: dict[str, dict[str, list[str]]] = {
-    "S0": {"steps": [], "config": [], "session": ["*"]},
-    "S1": {"steps": [], "config": ["frames"], "session": []},
-    "S2": {"steps": ["S1"], "config": ["pose", "paths.pose_model_file",
-                                       "quality_gates"], "session": []},
+    "S0": {"steps": [], "config": [], "session": ["*"],
+           "code": ["steps/s00_ingest.py"]},
+    "S1": {"steps": [], "config": ["frames"], "session": [],
+           "code": ["steps/s01_frames.py", "steps/s00_ingest.py"]},
+    "S2": {"steps": ["S1"], "config": ["pose", "paths.pose_model_file", "quality_gates"],
+           "session": [], "code": ["steps/s02_pose.py", "pose_worker.py"]},
     "S3": {"steps": ["S1", "S2"], "config": ["quality_gates", "smoothing"],
-           "session": ["draw_hand"]},
+           "session": ["draw_hand"],
+           "code": ["steps/s03_kinematics.py", "geometry.py", "landmarks.py"]},
     "S4": {"steps": ["S1", "S3"], "config": ["phase_rules", "quality_gates"],
-           "session": ["manual_phase_overrides", "number_of_shots_expected"]},
-    "S5": {"steps": ["S0", "S2", "S3", "S4"], "config": ["stats", "benchmarks",
-                                                        "quality_gates"], "session": []},
-    "S6": {"steps": ["S1", "S3", "S4", "S5"], "config": ["render"], "session": []},
-    "S7": {"steps": ["S0", "S1", "S3", "S4"], "config": ["video"], "session": []},
-    "S8": {"steps": ["S5", "S6"], "config": ["llm", "prompts", "report"], "session": []},
-    "S9": {"steps": ["S5", "S8"], "config": ["llm", "prompts", "benchmarks", "report"], "session": []},
-    "S10": {"steps": ["S0", "S5", "S6", "S8", "S9"], "config": ["render", "report"], "session": ["*"]},
+           "session": ["manual_phase_overrides", "number_of_shots_expected"],
+           "code": ["steps/s04_phases.py", "phase_defs.py"]},
+    "S5": {"steps": ["S0", "S2", "S3", "S4"], "config": ["stats", "benchmarks", "quality_gates"],
+           "session": [], "code": ["steps/s05_stats.py"]},
+    "S6": {"steps": ["S1", "S3", "S4", "S5"], "config": ["render"], "session": [],
+           "code": ["steps/s06_annotate.py", "overlay.py", "framedata.py", "phase_defs.py"]},
+    "S7": {"steps": ["S0", "S1", "S3", "S4"], "config": ["video"], "session": [],
+           "code": ["steps/s07_video.py", "overlay.py", "framedata.py", "versioning.py"]},
+    "S8": {"steps": ["S5", "S6"], "config": ["llm", "prompts", "report"], "session": [],
+           "code": ["steps/s08_narrate.py", "narrator.py", "report_spec.py", "llm.py",
+                    "grounding.py"]},
+    "S9": {"steps": ["S5", "S8"], "config": ["llm", "prompts", "benchmarks", "report"],
+           "session": [],
+           "code": ["steps/s09_verify.py", "narrator.py", "report_spec.py", "grounding.py"]},
+    "S10": {"steps": ["S0", "S5", "S6", "S8", "S9"], "config": ["render", "report"],
+            "session": ["*"],
+            "code": ["steps/s10_render.py", "overlay.py", "grounding.py", "framedata.py",
+                     "../../templates/report.html.j2"]},
 }
+
+_CODE_CACHE: dict[str, str] = {}
+
+
+def _code_hash(rel_paths: list[str]) -> str:
+    """Fingerprint of the source that produces a step's output.
+
+    Without this, editing a step's code leaves its cached output in place and the
+    pipeline silently serves stale results. That happened once: S5's evidence-key
+    rename never took effect because only its config was hashed.
+    """
+    from pathlib import Path as _P
+    base = _P(__file__).resolve().parent
+    h = hashlib.sha256()
+    for rel in sorted(rel_paths):
+        p = (base / rel).resolve()
+        key = str(p)
+        if key not in _CODE_CACHE:
+            _CODE_CACHE[key] = (hashlib.sha256(p.read_bytes()).hexdigest()
+                                if p.is_file() else "missing")
+        h.update(rel.encode())
+        h.update(_CODE_CACHE[key].encode())
+    return h.hexdigest()[:16]
 
 
 def compute_input_hash(ctx: Context, step_id: str) -> str:
@@ -88,6 +124,7 @@ def compute_input_hash(ctx: Context, step_id: str) -> str:
     h.update(step_id.encode())
     h.update(str(state.data.get("video_sha256")).encode())
     h.update(ctx.cfg.slice_hash(deps["config"]).encode())
+    h.update(_code_hash(deps.get("code", [])).encode())
     if deps["session"] == ["*"]:
         session_part = ctx.session
     else:

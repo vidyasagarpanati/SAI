@@ -118,6 +118,28 @@ is cached, so re-running is fast, and editing one section's instructions in
 Token usage per run is in `runs\<run_id>\08_narrative\usage.json` and in the
 report's Section 20 provenance table.
 
+## What a run costs
+
+Measured on the Kalpana video (4 shots, 9 phases, RTX 3060 12GB, qwen3.6:35b):
+
+| Step | Time |
+|---|---|
+| S0 ingest, S1 frames | seconds |
+| S2 pose | about 2.5 min |
+| S3 kinematics, S4 phases, S5 stats | seconds |
+| S6 annotate | about 16 min |
+| S7 video | about 3.5 min |
+| S8 narrate | about 12.5 min (23 calls, 25-50 s each) |
+| S9 verify, S10 render | seconds, plus any repair calls |
+
+Every step prints its start, result and duration, and S8 prints one line per
+model call with tokens and a running ETA. `archery status` shows the same table
+afterwards. Reruns reuse cached model replies, so an unchanged section costs
+nothing.
+
+If a step is skipped as unchanged it prints nothing and shows `-` for its
+duration in the table. That is the resume cache doing its job.
+
 ## Day-to-day commands
 
 | Need | Command |

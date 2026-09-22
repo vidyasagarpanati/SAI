@@ -52,3 +52,39 @@ def test_doctor_llm_probe_writes_only_inside_the_whitelist():
     src = (ROOT / "src" / "archery" / "cli.py").read_text()
     assert "tempfile" not in src, "cli.py must not write to system temp directories"
     assert "_doctor_llm" in src
+
+
+def test_editing_a_step_invalidates_only_that_step(tmp_path, monkeypatch):
+    """Regression: S5's code changed, its cache key did not, and the pipeline
+    silently served the previous run's metrics with the old evidence keys."""
+    from archery import runner
+    cfg = load_config(ROOT)
+    session = {"draw_hand": "right", "athlete_name": "A"}
+    before = {s: compute_input_hash(_ctx(tmp_path, cfg, session), s) for s in ("S2", "S4", "S5", "S6")}
+    real = runner._code_hash
+
+    def fake(rel_paths):
+        return "CHANGED" if "steps/s05_stats.py" in rel_paths else real(rel_paths)
+
+    monkeypatch.setattr(runner, "_code_hash", fake)
+    after = {s: compute_input_hash(_ctx(tmp_path, cfg, session), s) for s in ("S2", "S4", "S5", "S6")}
+    assert before["S5"] != after["S5"], "editing s05_stats.py must invalidate S5"
+    assert before["S2"] == after["S2"] and before["S4"] == after["S4"]
+
+
+def test_every_step_declares_the_code_that_produces_it():
+    from pathlib import Path as _P
+    from archery.runner import STEP_DEPS
+    base = _P(__file__).resolve().parents[1] / "src" / "archery"
+    for step, deps in STEP_DEPS.items():
+        assert deps.get("code"), f"{step} declares no source files"
+        for rel in deps["code"]:
+            assert (base / rel).resolve().is_file(), f"{step}: missing {rel}"
+
+
+def test_shared_modules_invalidate_every_step_that_uses_them():
+    from archery.runner import STEP_DEPS
+    users = [s for s, d in STEP_DEPS.items() if "overlay.py" in d["code"]]
+    assert set(users) == {"S6", "S7", "S10"}
+    users = [s for s, d in STEP_DEPS.items() if "grounding.py" in d["code"]]
+    assert set(users) == {"S8", "S9", "S10"}
