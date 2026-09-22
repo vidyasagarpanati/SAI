@@ -18,6 +18,7 @@ class Context:
     video_path: Path
     session: dict[str, Any] = field(default_factory=dict)
     state: RunState | None = None
+    llm: Any = None          # injected LLM client (tests use a fake); S8 builds Ollama otherwise
 
     # -- conventional artefact locations --------------------------------
     @property

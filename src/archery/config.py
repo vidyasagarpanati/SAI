@@ -62,6 +62,7 @@ class Config:
     phase_rules: dict
     benchmarks: dict
     paths: Paths
+    prompts: dict
     config_hash: str
 
     def slice_hash(self, keys: list[str]) -> str:
@@ -77,6 +78,8 @@ class Config:
                 picked[key] = self.phase_rules
             elif key == "benchmarks":
                 picked[key] = self.benchmarks
+            elif key == "prompts":
+                picked[key] = self.prompts
             else:
                 picked[key] = self.get(key)
         return sha256_text(_canonical(picked))[:16]
@@ -107,12 +110,21 @@ def load_config(root: Path | None = None) -> Config:
     pipeline = yaml.safe_load((root / "config" / "pipeline.yaml").read_text(encoding="utf-8"))
     phase_rules = yaml.safe_load((root / "config" / "phase_rules.yaml").read_text(encoding="utf-8"))
     benchmarks = json.loads((root / "config" / "benchmarks.json").read_text(encoding="utf-8"))
+    prompts = {}
+    pdir = root / "config" / "prompts"
+    if pdir.is_dir():
+        for f in sorted(pdir.iterdir()):
+            if f.suffix == ".md":
+                prompts[f.stem] = f.read_text(encoding="utf-8")
+            elif f.suffix in (".yaml", ".yml"):
+                prompts[f.stem] = yaml.safe_load(f.read_text(encoding="utf-8"))
 
     # The reproducibility hash covers everything that can change a number.
     config_hash = sha256_text(_canonical({
         "pipeline": pipeline,
         "phase_rules": phase_rules,
         "benchmarks": benchmarks,
+        "prompts": prompts,
     }))[:16]
 
     return Config(
@@ -121,5 +133,6 @@ def load_config(root: Path | None = None) -> Config:
         phase_rules=phase_rules,
         benchmarks=benchmarks,
         paths=Paths.from_root(root, pipeline),
+        prompts=prompts,
         config_hash=config_hash,
     )

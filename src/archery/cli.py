@@ -161,10 +161,38 @@ def cmd_doctor(args) -> int:
     except Exception as exc:  # noqa: BLE001
         rows.append(("ollama", False, f"{base} unreachable: {exc}"))
 
+    if getattr(args, "llm", False):
+        # One tiny structured-output call through the same client S8 uses.
+        import tempfile
+        from archery.llm import OllamaClient
+        try:
+            client = OllamaClient(cfg, Path(tempfile.mkdtemp()))
+            caps = client.capabilities()
+            rows.append(("model capabilities", True, ", ".join(sorted(caps)) or "none reported"))
+            rows.append(("model vision", "vision" in caps,
+                         "key frames will be sent" if "vision" in caps else
+                         "no vision: image-dependent items will be NOT RELIABLY ASSESSABLE"))
+            import time as _t
+            t0 = _t.time()
+            out = client.chat_json(
+                "Reply with JSON only.",
+                "Return the evidence key shot1.AIM.elbow_bow_deg.mean wrapped in double braces "
+                "in the field 'text', and confidence HIGH.",
+                {"type": "object", "properties": {"text": {"type": "string"},
+                 "confidence": {"type": "string", "enum": ["HIGH", "MEDIUM", "LOW"]}},
+                 "required": ["text", "confidence"], "additionalProperties": False})
+            ok = "{{shot1.AIM.elbow_bow_deg.mean}}" in out.get("text", "").replace(" ", "")
+            rows.append(("structured output", ok,
+                         f"{_t.time() - t0:.0f}s, {client.usage['prompt_tokens']}+{client.usage['completion_tokens']} "
+                         f"tokens, reply={out}"))
+        except Exception as exc:  # noqa: BLE001
+            rows.append(("structured output", False, f"{type(exc).__name__}: {exc}"))
+
     width = max(len(name) for name, _, _ in rows)
     for name, ok, detail in rows:
         print(f"[{'ok ' if ok else 'XX '}] {name:<{width}}  {detail}")
-    blocking = [n for n, ok, _ in rows if not ok and n not in ("ffprobe", "ollama", "llm.model")]
+    blocking = [n for n, ok, _ in rows if not ok and n not in ("ffprobe", "ollama", "llm.model",
+                                                                   "model vision", "pyarrow+mediapipe")]
     if blocking:
         print(f"\nBlocking problems: {blocking}")
         print("Run scripts\\bootstrap.ps1 to fix the environment.")
@@ -272,6 +300,8 @@ def build_parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="command", required=True)
 
     d = sub.add_parser("doctor", help="Check the environment.")
+    d.add_argument("--llm", action="store_true",
+                   help="Also make one small structured-output call to the configured Ollama model.")
     d.set_defaults(func=cmd_doctor)
 
     i = sub.add_parser("init-session", help="Write a session.json template for a video.")

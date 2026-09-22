@@ -36,6 +36,13 @@ smoothing:
 stats:
   min_shots_for_sd: 3       # below this, SD and CV are suppressed, not estimated
 
+report:
+  # "inline" places the physiological sections 14 and 15 mid-report as in the
+  # Kalpana example (decision D10); "appendix" keeps master-prompt numbering 1-20
+  # and renders them as Appendix A and B after Section 20.
+  physio_placement: inline
+  model_image_max_width: 768    # key frames sent to the model are downscaled to this
+
 llm:
   base_url: http://localhost:11434
   model: qwen3.6:35b        # from `ollama list` on the Windows box, 2026-09-19
@@ -45,7 +52,8 @@ llm:
   num_ctx: 8192
   request_timeout_s: 300
   max_retries_per_section: 2
-  send_key_frames_to_model: true
+  send_key_frames_to_model: true   # only if the model reports the vision capability
+  think: false                     # disable reasoning tokens on thinking models (Qwen3)
   max_images_per_section: 2
 
 render:

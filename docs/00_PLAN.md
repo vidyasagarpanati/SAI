@@ -236,7 +236,7 @@ Windows-specific implementation notes:
 | S2 pose (isolated worker), S3 kinematics | done |
 | S4 phases, S5 stats | done |
 | S6 annotate, S7 video | done |
-| S8 narrate, S9 verify, S10 render | queued |
+| S8 narrate, S9 verify, S10 render | done |
 
 ### Change log (2026-09-22)
 
@@ -261,3 +261,19 @@ Windows-specific implementation notes:
 - Fix found by visual inspection: speeds were differentiated from raw landmark
   positions, so jitter read as motion (held aim ~1.16 SW/s). Now computed from
   smoothed positions (~0.21 SW/s); regression test added.
+
+### Change log (2026-09-23, S8-S10)
+
+- Evidence placeholders: the model writes `{{evidence.key}}`, never a number.
+  `grounding.py` rejects typed numbers and unknown keys in every free-text field;
+  only ids, evidence keys and closed enums are exempt (a test caught a free-text
+  field wrongly exempted).
+- Prompts live in `config/prompts/` (system rules, scoring rubric, per-section
+  instructions condensed from the master prompt). They are part of S8's cache key.
+- 23 calls per single-shot run: 9 phase calls with one key frame each, 14 section
+  calls text-only except quality and equipment. Later sections receive earlier
+  sections' JSON, not raw metrics.
+- S9 repair loop regenerates only failing sections, with the violations listed.
+- S10 re-renders key frames with verified coaching text; model text is
+  HTML-escaped; report is refused if S9 did not pass.
+- `archery doctor --llm` makes one structured-output call to check the model.

@@ -1,0 +1,103 @@
+# Section-specific instructions, condensed from the master prompt. Edit here;
+# the narrate step re-runs only the sections whose text changed.
+
+s02_quality: |
+  Section 2, VIDEO & DATA QUALITY. Resolution, frame rate, pose-detection rate and
+  overall analysis confidence are already computed and rendered. You assess only:
+  camera angle, lighting, athlete visibility, occlusion, motion blur, clothing
+  interference, and list the concrete limitations these impose on the analysis.
+
+s04_phase: |
+  Section 4, SKILL-PHASE ANALYSIS, for ONE extracted phase. Apply every applicable
+  criterion from groups A-H of the master prompt (A stance, B setup, C draw,
+  D anchor, E aim, F expansion, G release, H follow-through) that fits this
+  phase's biomechanics. Each point must cite evidence keys or be OBSERVED from the
+  image. Also write one frame_rows entry per shot for the frame-by-frame table,
+  and one coaching_implication sentence for the annotated key frame.
+
+s05_biomech: |
+  Section 5, BIOMECHANICAL ANALYSIS. Cover shoulder alignment, shoulder
+  elevation/depression, scapular position, elbow and wrist alignment, hip and
+  pelvic position, spine posture, trunk inclination, neck and head position, knee
+  alignment, ankle position, centre of gravity, body sway, symmetry, unnecessary
+  movement and movement efficiency. Statistics tables are rendered separately;
+  you interpret them. Do not invent reference values.
+
+s06_consistency: |
+  Section 6, CROSS-PHASE CONSISTENCY. Tables and rankings are rendered
+  separately. Explain the likely effect of the observed consistency on accuracy,
+  grouping, arrow flight, repeatability and pressure performance. If fewer than 3
+  shots were analysed, say shot-to-shot consistency is NOT RELIABLY ASSESSABLE
+  and limit yourself to within-shot observations.
+
+s08_equipment: |
+  Section 8, EQUIPMENT OBSERVATIONS. Only visible equipment. For each aspect
+  (bow fit, draw length, arrow length, arrow spine indications, stabilizer
+  behaviour, string alignment, nocking-point clues, grip configuration, bow
+  torque, equipment-induced movement) classify VISIBLE, INFERRED or NOT
+  ASSESSABLE. Never make a definitive equipment recommendation without evidence.
+
+s09_errors: |
+  Section 9, TECHNICAL ERROR DETECTION. List significant technical errors only,
+  ranked by performance impact, consistency impact, biomechanical importance,
+  injury relevance, then correctability. Severity CRITICAL, MODERATE or MINOR.
+  Every error needs evidence keys. Zero errors is a valid answer if none are
+  evidenced.
+
+s10_injury: |
+  Section 10, INJURY RISK-FACTOR ASSESSMENT. NON-DIAGNOSTIC movement assessment
+  only. Consider excessive shoulder elevation, scapular control, shoulder
+  rotation, elbow loading, wrist deviation, cervical movement, trunk control,
+  repetitive asymmetry, joint loading, movement control, compensation and
+  repeated faults. Include a factor only when evidenced. Never name a condition.
+
+s11_framework: |
+  Section 11, ARCHERY BIOMECHANICS ASSESSMENT FRAMEWORK. Score all 13 categories
+  A Alignment, B Stability, C Mobility, D Strength, E Coordination, F Timing,
+  G Force Production, H Force Transfer, I Movement Efficiency, J Repeatability,
+  K Equipment Interaction, L Postural Control, M Shot-Cycle Consistency, using
+  the rubric. Strength and force categories are rarely assessable from video;
+  score them null unless evidenced.
+
+s12_scorecard: |
+  Section 12, PERFORMANCE SCORECARD. Score every extracted phase listed, plus
+  shot consistency, biomechanical efficiency, movement stability and overall
+  technique, using the rubric. Scores must follow from Sections 9 to 11 given.
+
+s13_strengths: |
+  Section 13, TOP STRENGTHS. Up to 10 strengths supported by the evidence and the
+  earlier sections. Do not invent strengths to reach ten; fewer is correct when
+  fewer are evidenced.
+
+s14_weaknesses: |
+  Section 14, TOP WEAKNESSES. Up to 10, ranked by accuracy impact, consistency
+  impact, biomechanical significance, injury-risk relevance, ease of correction.
+  Link each to the technical errors (E ids) it comes from where applicable.
+
+s15_priorities: |
+  Section 15, PRIORITIZED IMPROVEMENT PLAN. Exactly FIVE priorities, each tied to
+  a weakness (W id) or error (E id). Give a concrete technical drill with sets,
+  repetitions, frequency, progression and a success metric that references an
+  evidence key where one exists.
+
+s16_training_coaching: |
+  Sections 16 and 17, TRAINING RECOMMENDATIONS and COACHING PRIORITIES.
+  Training: technical, strength and conditioning, mental, and warm-up
+  recommendations, each with purpose, exercise, sets, repetitions, frequency,
+  coaching cue and progression, and only when it addresses an identified
+  weakness or error (list their ids in addresses). Coaching priorities:
+  immediate, short term (2-4 weeks), long term (2-3 months), each tied to ids.
+
+s18_projection_final: |
+  Sections 18 and 19, PERFORMANCE PROJECTION and FINAL COACHING SUMMARY.
+  Projection: likely improvement in consistency, grouping, stability,
+  repeatability and movement efficiency based only on observed characteristics.
+  Never guarantee or quantify a score gain. Final summary: exactly 3 things done
+  well (S ids), exactly 3 things to fix first (W or E ids, matching the top
+  priorities), one single most important correction, one short coaching cue,
+  and a concise final assessment.
+
+s01_executive: |
+  Section 1, EXECUTIVE SUMMARY, written last from the finished sections. Every
+  item must restate a finding that already exists in those sections and carry
+  its reference id. Introduce nothing new. Keep it concise.

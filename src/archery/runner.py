@@ -65,9 +65,9 @@ STEP_DEPS: dict[str, dict[str, list[str]]] = {
                                                         "quality_gates"], "session": []},
     "S6": {"steps": ["S1", "S3", "S4", "S5"], "config": ["render"], "session": []},
     "S7": {"steps": ["S0", "S1", "S3", "S4"], "config": ["video"], "session": []},
-    "S8": {"steps": ["S5", "S6"], "config": ["llm"], "session": []},
-    "S9": {"steps": ["S5", "S8"], "config": ["llm", "benchmarks"], "session": []},
-    "S10": {"steps": ["S0", "S5", "S6", "S8", "S9"], "config": ["render"], "session": []},
+    "S8": {"steps": ["S5", "S6"], "config": ["llm", "prompts", "report"], "session": []},
+    "S9": {"steps": ["S5", "S8"], "config": ["llm", "prompts", "benchmarks", "report"], "session": []},
+    "S10": {"steps": ["S0", "S5", "S6", "S8", "S9"], "config": ["render", "report"], "session": ["*"]},
 }
 
 

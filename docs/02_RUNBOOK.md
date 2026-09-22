@@ -82,6 +82,42 @@ images and the report agree exactly. The coaching box on key frames reads
 PENDING until S10 re-renders the frames with the verified narrative. Video
 rendering runs on CPU and prints progress; expect roughly real time or slower.
 
+## The report (S8, S9, S10)
+
+Before the first full run, check that the model returns structured JSON:
+
+```powershell
+archery doctor --llm
+```
+
+`structured output` must be `[ok ]`. `model vision` tells you whether key frames
+will be sent to the model; without vision, anything that needs looking at the
+image (grip, string contact, finger relaxation) is reported as NOT RELIABLY
+ASSESSABLE instead of guessed.
+
+How the narrative is kept honest:
+
+1. **S8** makes one call per section (one per detected phase for Section 4),
+   temperature 0, fixed seed, JSON schema enforced. The model never types a
+   measured number: it writes evidence keys like
+   `{{shot1.AIM.elbow_bow_deg.mean}}` and the renderer substitutes the value.
+   Each output is checked before it is accepted (schema, grounding, section
+   rules) and regenerated with the exact violations listed if it fails.
+2. **S9** runs the master prompt's consistency checklist mechanically, plus
+   cross-section checks (executive summary and final summary must match the
+   ranked weaknesses and priority #1). Failing sections go back to the model.
+   If S9 still fails, **no report is written**.
+3. **S10** writes `outputs\Archery_Report_<Athlete>_<date>_vNN.html` with a
+   `.sha256` and `.manifest.json`. Self-contained, versioned, never overwritten.
+
+Expect about 23 model calls per video. With `qwen3.6:35b` partly offloaded
+from the 12GB card, allow several minutes per call on the first run. Every call
+is cached, so re-running is fast, and editing one section's instructions in
+`config/prompts/sections.yaml` regenerates only what changed.
+
+Token usage per run is in `runs\<run_id>\08_narrative\usage.json` and in the
+report's Section 20 provenance table.
+
 ## Day-to-day commands
 
 | Need | Command |

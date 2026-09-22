@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Archery Biomechanics Report - {{ v.athlete_name }}</title>
+<style>
+:root{--ink:#1d2330;--muted:#5d6678;--line:#dfe3ea;--bg:#f6f7fa;--card:#fff;--accent:#1f4e79;
+--hi:#1e7d4f;--me:#b7791f;--lo:#b8322a;--chip:#eef1f6}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.55 -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg)}
+header.top{background:linear-gradient(120deg,#12324f,#1f4e79);color:#fff;padding:28px 32px}
+header.top h1{margin:0 0 4px;font-size:24px;letter-spacing:.3px}
+header.top .sub{opacity:.85;font-size:13px}
+nav{position:sticky;top:0;z-index:5;background:#fff;border-bottom:1px solid var(--line);overflow-x:auto;white-space:nowrap;padding:6px 16px}
+nav a{display:inline-block;padding:6px 9px;margin:2px;border-radius:6px;color:var(--accent);text-decoration:none;font-size:12.5px}
+nav a:hover{background:var(--chip)}
+main{max-width:1180px;margin:0 auto;padding:20px 16px 60px}
+section{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:20px 24px;margin:18px 0}
+section h2{margin:0 0 12px;font-size:19px;color:var(--accent);border-bottom:2px solid var(--line);padding-bottom:8px}
+section h3{font-size:16px;margin:18px 0 8px}
+table{border-collapse:collapse;width:100%;margin:8px 0 14px;font-size:13.5px}
+th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+th{background:#f0f3f8;font-weight:600}
+td.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.chip{display:inline-block;font-size:11px;font-weight:600;padding:1px 7px;border-radius:10px;background:var(--chip);color:#334;margin-right:4px}
+.c-HIGH{background:#e3f4ec;color:var(--hi)}.c-MEDIUM{background:#fbf1de;color:var(--me)}.c-LOW{background:#fbe6e4;color:var(--lo)}
+.sev-CRITICAL{background:#fbe6e4;color:var(--lo)}.sev-MODERATE{background:#fbf1de;color:var(--me)}.sev-MINOR{background:#eef1f6;color:#445}
+.na{color:var(--muted);font-style:italic}
+.kv{display:grid;grid-template-columns:260px 1fr;gap:4px 14px}
+.kv div:nth-child(odd){color:var(--muted)}
+.frame{margin:10px 0 16px}
+.frame img{width:100%;height:auto;border-radius:6px;border:1px solid var(--line)}
+.frame .cap{font-size:12.5px;color:var(--muted);margin-top:4px}
+.noframe{background:#eceff3;border:1px dashed #b9c0cc;color:#5a6270;text-align:center;padding:38px 12px;border-radius:6px;font-weight:600;margin:10px 0}
+.phase{border-left:6px solid var(--accent);padding-left:14px;margin:22px 0}
+.prio{border:1px solid var(--line);border-radius:8px;padding:12px 16px;margin:12px 0}
+.score{font-weight:700;font-size:15px}
+.cue{font-size:18px;font-weight:600;color:var(--accent)}
+footer{color:var(--muted);font-size:12px;text-align:center;margin-top:30px}
+@media (max-width:720px){.kv{grid-template-columns:1fr}header.top{padding:20px 16px}section{padding:16px}}
+@media print{nav{display:none}section{break-inside:avoid-page}}
+</style>
+</head>
+<body>
+{% macro conf(c) %}{% if c %}<span class="chip c-{{ c }}">{{ c }}</span>{% endif %}{% endmacro %}
+{% macro lvl(l) %}{% if l %}<span class="chip">[{{ l }}]</span>{% endif %}{% endmacro %}
+{% macro txt(t) %}{% if t is none or t == "" %}<span class="na">Not available from supplied video.</span>{% elif "NOT RELIABLY ASSESSABLE" in t or "NOT PROVIDED" in t %}<span class="na">{{ t }}</span>{% else %}{{ t }}{% endif %}{% endmacro %}
+{% macro score(s) %}{% if s is none %}<span class="na">NOT RELIABLY ASSESSABLE</span>{% else %}<span class="score">{{ s }}/10</span>{% endif %}{% endmacro %}
+
+<header class="top">
+  <h1>ARCHERY VIDEO &amp; BIOMECHANICS ANALYSIS REPORT</h1>
+  <div class="sub">{{ v.athlete_name }} &middot; {{ v.session_date }} &middot; report {{ v.version_label }} &middot; run {{ v.run_id }}</div>
+</header>
+<nav>{% for s in v.order %}<a href="#sec-{{ s.key }}">{{ s.number }}. {{ s.title|title }}</a>{% endfor %}</nav>
+<main>
+
+<section id="sec-info">
+  <h2>ATHLETE / SESSION INFORMATION</h2>
+  <div class="kv">{% for k, val in v.info %}<div>{{ k }}</div><div>{{ txt(val) }}</div>{% endfor %}</div>
+  <h3>Basic Athlete &amp; Session Information</h3>
+  <table><tr><th>Field</th><th>Value (or "NOT PROVIDED")</th></tr>
+  {% for k, val in v.pre_basic %}<tr><td>{{ k }}</td><td>{{ txt(val) }}</td></tr>{% endfor %}</table>
+  <h3>Video-Specific Metadata</h3>
+  <table><tr><th>Field</th><th>Value (or "NOT PROVIDED")</th></tr>
+  {% for k, val in v.pre_video %}<tr><td>{{ k }}</td><td>{{ txt(val) }}</td></tr>{% endfor %}</table>
+  <p><b>Additional Data Available:</b> {% if v.additional %}{{ v.additional|join("; ") }}{% else %}<span class="na">NOT PROVIDED - CANNOT BE CONFIRMED</span>{% endif %}</p>
+</section>
+
+{% for s in v.order %}
+<section id="sec-{{ s.key }}">
+<h2>{{ s.number }}. {{ s.title }}</h2>
+{% set k = s.key %}
+
+{% if k == "s01" %}{% set e = v.n.s01_executive %}
+  <table>
+  <tr><th style="width:32%">Estimated technical level</th><td>{{ txt(e.technical_level) }}</td></tr>
+  <tr><th>Overall technique score</th><td>{{ score(v.overall_score) }} <span class="na">(from Section 12)</span></td></tr>
+  <tr><th>Strongest technical characteristic</th><td>{{ e.strongest_characteristic.text }} <span class="chip">{{ e.strongest_characteristic.ref }}</span></td></tr>
+  <tr><th>Most important weakness</th><td>{{ e.most_important_weakness.text }} <span class="chip">{{ e.most_important_weakness.ref }}</span></td></tr>
+  <tr><th>Main consistency limitation</th><td>{{ txt(e.main_consistency_limitation) }}</td></tr>
+  <tr><th>Main biomechanical limitation</th><td>{{ txt(e.main_biomechanical_limitation) }}</td></tr>
+  <tr><th>Main injury-risk factor</th><td>{{ txt(e.main_injury_risk_factor) }}</td></tr>
+  <tr><th>Most important correction</th><td>{{ e.most_important_correction.text }} <span class="chip">{{ e.most_important_correction.ref }}</span></td></tr>
+  <tr><th>Expected improvement opportunity</th><td>{{ txt(e.expected_improvement_opportunity) }}</td></tr>
+  </table>
+
+{% elif k == "s02" %}{% set q = v.n.s02_quality %}
+  <table>{% for label, val in v.quality_rows %}<tr><th style="width:32%">{{ label }}</th><td>{{ txt(val) }}</td></tr>{% endfor %}
+  {% for f in ["camera_angle","lighting","athlete_visibility","occlusion","motion_blur","clothing_interference"] %}
+  <tr><th>{{ f|replace("_"," ")|capitalize }}</th><td>{{ txt(q[f]) }}</td></tr>{% endfor %}</table>
+  <p><b>OVERALL ANALYSIS CONFIDENCE:</b> {{ conf(v.overall_conf) }} <span class="na">{{ v.overall_rule }}</span></p>
+  <h3>Limitations</h3><ul>{% for l in q.limitations %}<li>{{ l }}</li>{% endfor %}</ul>
+
+{% elif k == "s03" %}
+  <table><tr><th>Shot</th><th>Timestamp</th><th>Phase</th><th>Observation</th><th>Measurement</th><th>Interpretation</th><th>Confidence</th></tr>
+  {% for r in v.frame_rows %}<tr><td>{{ r.shot }}</td><td class="num">{{ r.ts }}</td><td>{{ r.phase }}</td>
+  <td>{{ lvl(r.level) }}{{ txt(r.observation) }}</td><td>{{ r.measurement }}</td><td>{{ txt(r.interpretation) }}</td><td>{{ conf(r.confidence) }}</td></tr>{% endfor %}</table>
+
+{% elif k == "s04" %}
+  {% for p in v.phases %}
+  <div class="phase" style="border-color:{{ p.color }}">
+    <h3>Phase {{ p.badge }}: {{ p.name }}</h3>
+    {% if p.detected %}
+      <p class="na">{{ p.timing }} &middot; criteria applied: {{ p.criteria|join(", ") }}</p>
+      <ul>{% for a in p.analysis %}<li>{{ lvl(a.evidence_level) }}{{ conf(a.confidence) }} {{ txt(a.point) }}</li>{% endfor %}</ul>
+      {% for f in p.frames %}<div class="frame"><img alt="Annotated key frame, shot {{ f.shot }}, {{ p.name }}" src="data:image/jpeg;base64,{{ f.b64 }}"><div class="cap">Shot {{ f.shot }} &middot; t = {{ f.t }} s &middot; frame {{ f.frame }}</div></div>{% endfor %}
+      <p><b>Coaching implication:</b> {{ txt(p.coaching) }}</p>
+    {% else %}
+      <div class="noframe">[ANNOTATED FRAME NOT AVAILABLE]</div>
+      <p class="na">Phase not extracted: {{ p.reason }}</p>
+    {% endif %}
+  </div>{% endfor %}
+
+{% elif k == "s05" %}
+  <h3>Full-draw (Aim phase) statistics</h3>
+  <table><tr><th>Measure</th><th>Min</th><th>Max</th><th>Mean</th><th>Range</th><th>SD</th><th>Shot-to-shot SD</th><th>Confidence</th></tr>
+  {% for r in v.stats_rows %}<tr><td>{{ r.name }}</td><td class="num">{{ r.min }}</td><td class="num">{{ r.max }}</td><td class="num">{{ r.mean }}</td><td class="num">{{ r.range }}</td><td class="num">{{ r.sd }}</td><td>{{ r.xsd }}</td><td>{{ conf(r.conf) }}</td></tr>{% endfor %}</table>
+  <h3>Interpretation</h3>
+  <ul>{% for f in v.n.s05_biomech.findings %}<li><b>{{ f.topic }}:</b> {{ lvl(f.evidence_level) }}{{ conf(f.confidence) }} {{ txt(f.finding) }}</li>{% endfor %}</ul>
+
+{% elif k == "s06" %}
+  <h3>Phase timing across shots</h3>
+  <table><tr><th>Phase</th><th>Shots</th><th>Durations (s)</th><th>Mean</th><th>SD</th><th>CV</th></tr>
+  {% for r in v.timing_rows %}<tr><td>{{ r.phase }}</td><td class="num">{{ r.n }}</td><td>{{ r.values }}</td><td class="num">{{ r.mean }}</td><td class="num">{{ r.sd }}</td><td class="num">{{ r.cv }}</td></tr>{% endfor %}</table>
+  <table>{% for label, val in v.rankings %}<tr><th style="width:32%">{{ label }}</th><td>{{ txt(val) }}</td></tr>{% endfor %}</table>
+  <h3>Likely effects</h3>
+  <table><tr><th>Aspect</th><th>Explanation</th><th>Confidence</th></tr>
+  {% for e in v.n.s06_consistency.effects %}<tr><td>{{ e.aspect }}</td><td>{{ txt(e.explanation) }}</td><td>{{ conf(e.confidence) }}</td></tr>{% endfor %}</table>
+  <p>{{ txt(v.n.s06_consistency.notes) }}</p>
+
+{% elif k == "s07" %}
+  <table><tr><th>Variable</th><th>Athlete Measurement</th><th>Reference/Target</th><th>Difference</th><th>Interpretation</th><th>Confidence</th></tr>
+  {% for r in v.bench_rows %}<tr><td>{{ r.variable }}</td><td class="num">{{ r.athlete }}</td><td>{{ r.reference }}</td><td class="num">{{ r.diff }}</td><td>{{ r.interp }}</td><td>{{ conf(r.conf) }}</td></tr>{% endfor %}</table>
+  {% if v.bench_rejected %}<p class="na">Benchmark entries excluded for lack of a citation: {{ v.bench_rejected|join("; ") }}</p>{% endif %}
+
+{% elif k == "s08" %}
+  <table><tr><th>Aspect</th><th>Classification</th><th>Observation</th><th>Confidence</th></tr>
+  {% for i in v.n.s08_equipment["items"] %}<tr><td>{{ i.aspect }}</td><td><span class="chip">{{ i.classification }}</span></td><td>{{ txt(i.observation) }}</td><td>{{ conf(i.confidence) }}</td></tr>{% endfor %}</table>
+
+{% elif k == "s09" %}
+  {% if v.n.s09_errors.errors %}
+  <table><tr><th>Rank</th><th>Error</th><th>Timestamp</th><th>Phase</th><th>Evidence</th><th>Cause</th><th>Biomechanical Effect</th><th>Performance Effect</th><th>Severity</th><th>Correction</th></tr>
+  {% for e in v.n.s09_errors.errors|sort(attribute="rank") %}<tr><td>{{ e.rank }} <span class="chip">{{ e.id }}</span></td><td>{{ e.error }}</td><td class="num">{{ e.timestamp }}</td><td>{{ e.phase }}</td><td>{{ txt(e.evidence) }} {{ conf(e.confidence) }}</td><td>{{ e.cause }}</td><td>{{ e.biomechanical_effect }}</td><td>{{ e.performance_effect }}</td><td><span class="chip sev-{{ e.severity }}">{{ e.severity }}</span></td><td>{{ e.correction }}</td></tr>{% endfor %}</table>
+  {% else %}<p class="na">No significant technical errors could be established from the available evidence.</p>{% endif %}
+
+{% elif k == "s10" %}
+  <p class="na">NON-DIAGNOSTIC movement assessment. Items are potential movement-related risk factors, not diagnoses.</p>
+  {% if v.n.s10_injury.risks %}
+  <table><tr><th>Risk Factor</th><th>Evidence</th><th>Possible Concern</th><th>Severity</th><th>Corrective Strategy</th><th>Confidence</th></tr>
+  {% for r in v.n.s10_injury.risks %}<tr><td>{{ r.factor }}</td><td>{{ txt(r.evidence) }}</td><td>{{ r.possible_concern }}</td><td><span class="chip sev-{{ r.severity }}">{{ r.severity }}</span></td><td>{{ r.corrective_strategy }}</td><td>{{ conf(r.confidence) }}</td></tr>{% endfor %}</table>
+  {% else %}<p class="na">No movement-related risk factor could be established from the available evidence.</p>{% endif %}
+
+{% elif k == "s11" %}
+  <table><tr><th>Category</th><th>Score /10</th><th>Evidence</th><th>Main Limitation</th><th>Coaching Recommendation</th></tr>
+  {% for c in v.framework %}<tr><td>{{ c.label }}</td><td>{{ score(c.score) }} {{ conf(c.confidence) }}</td><td>{{ txt(c.evidence) }}</td><td>{{ txt(c.main_limitation) }}</td><td>{{ txt(c.recommendation) }}</td></tr>{% endfor %}</table>
+
+{% elif k == "s12" %}{% set sc = v.n.s12_scorecard %}
+  <table><tr><th>Item</th><th>Score</th><th>Justification</th><th>Confidence</th></tr>
+  {% for p in sc.phases %}<tr><td>{{ p.phase_name }}</td><td>{{ score(p.score) }}</td><td>{{ txt(p.justification) }}</td><td>{{ conf(p.confidence) }}</td></tr>{% endfor %}
+  {% for key, label in [("shot_consistency","Shot consistency"),("biomechanical_efficiency","Biomechanical efficiency"),("movement_stability","Movement stability"),("overall_technique","Overall technique")] %}
+  <tr><th>{{ label }}</th><td>{{ score(sc[key].score) }}</td><td>{{ txt(sc[key].justification) }}</td><td>{{ conf(sc[key].confidence) }}</td></tr>{% endfor %}</table>
+
+{% elif k == "s13" %}
+  {% for i in v.n.s13_strengths["items"] %}<div class="prio"><b>{{ loop.index }}. {{ i.strength }}</b> <span class="chip">{{ i.id }}</span> {{ conf(i.confidence) }}
+  <div><b>Evidence:</b> {{ txt(i.evidence) }}</div><div><b>Biomechanical reason:</b> {{ i.biomechanical_reason }}</div>
+  <div><b>Performance benefit:</b> {{ i.performance_benefit }}</div><div><b>Maintenance strategy:</b> {{ i.maintenance_strategy }}</div></div>{% endfor %}
+  {% if v.n_strengths < 10 %}<p><b>Only {{ v.n_strengths }} strengths could be reliably established from the available video.</b></p>{% endif %}
+
+{% elif k == "s14" %}
+  {% for i in v.n.s14_weaknesses["items"]|sort(attribute="rank") %}<div class="prio"><b>{{ i.rank }}. {{ i.weakness }}</b> <span class="chip">{{ i.id }}</span> {{ conf(i.confidence) }} <span class="chip">Priority {{ i.priority }}</span>
+  <div><b>Evidence:</b> {{ txt(i.evidence) }}</div><div><b>Likely cause:</b> {{ i.likely_cause }}</div>
+  <div><b>Performance consequence:</b> {{ i.performance_consequence }}</div><div><b>Correction:</b> {{ i.correction }}</div></div>{% endfor %}
+
+{% elif k == "s15" %}
+  {% for p in v.n.s15_priorities.priorities|sort(attribute="rank") %}<div class="prio">
+  <h3>PRIORITY #{{ p.rank }} - {{ p.issue }} <span class="chip">{{ p.weakness_ref }}</span> {{ conf(p.confidence) }}</h3>
+  <table>
+  {% for f, label in [("current_problem","Current problem"),("evidence","Evidence"),("timestamp","Timestamp"),("shot_phase","Shot phase"),("why_it_matters","Why it matters"),("biomechanical_consequence","Biomechanical consequence"),("performance_consequence","Performance consequence"),("corrective_strategy","Corrective strategy"),("technical_drill","Technical drill"),("sets","Sets"),("repetitions","Repetitions"),("frequency","Frequency"),("progression","Progression"),("success_metric","Success metric")] %}
+  <tr><th style="width:28%">{{ label }}</th><td>{{ txt(p[f]) }}</td></tr>{% endfor %}</table></div>{% endfor %}
+
+{% elif k == "s16" %}{% set t = v.n.s16_training_coaching %}
+  {% for grp, label in [("technical","A. TECHNICAL TRAINING"),("strength_conditioning","B. STRENGTH & CONDITIONING"),("mental","C. MENTAL TRAINING"),("warm_up","D. WARM-UP")] %}
+  <h3>{{ label }}</h3>
+  {% if t[grp] %}<table><tr><th>Purpose</th><th>Exercise/Drill</th><th>Sets</th><th>Repetitions</th><th>Frequency</th><th>Coaching Cue</th><th>Progression</th><th>Addresses</th></tr>
+  {% for r in t[grp] %}<tr><td>{{ r.purpose }}</td><td>{{ r.exercise }}</td><td>{{ r.sets }}</td><td>{{ r.repetitions }}</td><td>{{ r.frequency }}</td><td>{{ r.coaching_cue }}</td><td>{{ r.progression }}</td><td>{{ r.addresses|join(", ") }}</td></tr>{% endfor %}</table>
+  {% else %}<p class="na">No recommendation: no identified deficiency in this area.</p>{% endif %}{% endfor %}
+
+{% elif k == "s17" %}{% set t = v.n.s16_training_coaching %}
+  {% for grp, label in [("immediate","IMMEDIATE - Next training sessions"),("short_term","SHORT TERM - Next 2-4 weeks"),("long_term","LONG TERM - Next 2-3 months")] %}
+  <h3>{{ label }}</h3><ul>{% for r in t[grp] %}<li>{{ r.recommendation }} <span class="chip">{{ r.addresses|join(", ") }}</span></li>{% endfor %}</ul>{% endfor %}
+
+{% elif k == "s18" %}
+  <table><tr><th>Aspect</th><th>Projection</th><th>Confidence</th></tr>
+  {% for p in v.n.s18_projection_final.projection %}<tr><td>{{ p.aspect }}</td><td>{{ txt(p.projection) }}</td><td>{{ conf(p.confidence) }}</td></tr>{% endfor %}</table>
+  <p class="na">No score improvement is guaranteed; no numerical performance gain is stated without baseline performance data.</p>
+
+{% elif k == "s19" %}{% set f = v.n.s18_projection_final %}
+  <h3>3 THINGS THE ARCHER DOES WELL</h3><ol>{% for i in f.does_well %}<li>{{ i.text }} <span class="chip">{{ i.ref }}</span></li>{% endfor %}</ol>
+  <h3>3 THINGS TO FIX FIRST</h3><ol>{% for i in f.fix_first %}<li>{{ i.text }} <span class="chip">{{ i.ref }}</span></li>{% endfor %}</ol>
+  <h3>SINGLE MOST IMPORTANT CORRECTION</h3><p>{{ f.single_correction.text }} <span class="chip">{{ f.single_correction.ref }}</span></p>
+  <h3>KEY COACHING CUE</h3><p class="cue">"{{ f.key_cue }}"</p>
+  <h3>FINAL ASSESSMENT</h3><p>{{ f.final_assessment }}</p>
+
+{% elif k == "s20" %}
+  <table><tr><th>Level</th><th>Definition</th><th>Items in this report</th></tr>
+  <tr><td>{{ conf("HIGH") }}</td><td>Clearly visible and/or reliably measured.</td><td class="num">{{ v.conf_counts.HIGH }}</td></tr>
+  <tr><td>{{ conf("MEDIUM") }}</td><td>Reasonably supported but limited by video quality.</td><td class="num">{{ v.conf_counts.MEDIUM }}</td></tr>
+  <tr><td>{{ conf("LOW") }}</td><td>Possible interpretation but insufficient evidence.</td><td class="num">{{ v.conf_counts.LOW }}</td></tr></table>
+  <p>LOW-confidence observations are never presented as definitive conclusions. Every number in this report is substituted from the measured evidence file; the narrative contains no typed measurements.</p>
+  <h3>Consistency control (automated verification)</h3>
+  <table><tr><th>Check</th><th>Result</th></tr>{% for c in v.checklist %}<tr><td>{{ c.check }}</td><td><span class="chip c-{{ 'HIGH' if c.status == 'PASS' else 'LOW' }}">{{ c.status }}</span></td></tr>{% endfor %}</table>
+  <h3>Provenance</h3>
+  <div class="kv">{% for k2, val in v.provenance %}<div>{{ k2 }}</div><div>{{ val }}</div>{% endfor %}</div>
+
+{% elif k in ("p1", "p2") %}
+  {% if v.physio[k] %}<p>{{ v.physio[k] }}</p>{% else %}<p class="na">NOT PROVIDED - CANNOT BE CONFIRMED. No physiological data file was supplied with this session.</p>{% endif %}
+{% endif %}
+</section>
+{% endfor %}
+<footer>Generated by the SAI archery biomechanics pipeline &middot; {{ v.generated }}</footer>
+</main>
+</body>
+</html>
