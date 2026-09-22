@@ -233,7 +233,19 @@ Windows-specific implementation notes:
 |---|---|
 | Scaffold, config, schemas, io_guard, run state, CLI, LangGraph, bootstrap | done |
 | S0 ingest, S1 frames | done |
-| S2 pose, S3 kinematics | next |
-| S4 phases, S5 stats | queued |
+| S2 pose (isolated worker), S3 kinematics | done |
+| S4 phases, S5 stats | done |
 | S6 annotate, S7 video | queued |
 | S8 narrate, S9 verify, S10 render | queued |
+
+### Change log (2026-09-22)
+
+- Cache keys are now per step (`runner.STEP_DEPS`): each step hashes only the
+  config slice, session fields and upstream outputs it reads. The run id is
+  `<video stem>__<video sha8>`. Tuning `phase_rules.yaml` re-runs S4 onward and
+  never pose estimation; renaming the athlete never re-decodes the video.
+- S2 runs MediaPipe in an isolated worker process (pyarrow/MediaPipe DLL clash
+  on Windows).
+- phase_rules.yaml v2: every key is read by S4, nothing decorative.
+- Phase badges follow the master prompt: STANCE 1, PRE_DRAW 2, DRAW 3,
+  ANCHOR 4, AIM 5, EXPANSION 6, RELEASE 7, FOLLOW_THROUGH 8, RECOVERY 9.

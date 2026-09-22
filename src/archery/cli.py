@@ -51,8 +51,10 @@ def _load_session(path: Path) -> dict:
 
 
 def _make_run_id(cfg, video: Path, digest: str) -> str:
-    """Deterministic: the same video and the same config always resume the same run."""
-    return f"{video.stem}__{digest[:8]}__{cfg.config_hash[:8]}"
+    """One run directory per video. Config changes are handled per step by the
+    cache keys in runner.STEP_DEPS, so tuning a threshold re-runs only the steps
+    that read it, inside the same run."""
+    return f"{video.stem}__{digest[:8]}"
 
 
 def cmd_init_session(args) -> int:

@@ -153,3 +153,21 @@ def build(seed: int = 7, noise: float = 0.0015) -> tuple[pd.DataFrame, dict]:
 def _vec_ease(x: np.ndarray) -> np.ndarray:
     x = np.clip(x, 0.0, 1.0)
     return x ** 2 * (3 - 2 * x)
+
+
+def build_multi(n_shots: int = 3, seed: int = 11) -> tuple[pd.DataFrame, dict]:
+    """``n_shots`` consecutive shot cycles with slightly different noise per shot,
+    so cross-shot statistics have real (small) variation to measure."""
+    parts, per = [], None
+    for k in range(n_shots):
+        df, truth = build(seed=seed + k, noise=0.0015 + 0.0004 * k)
+        per = truth["n_frames"]
+        df = df.copy()
+        df["frame"] = df["frame"] + k * per
+        df["t_ms"] = (df["frame"] * (1000.0 / FPS)).astype(np.float32)
+        parts.append(df)
+    out = pd.concat(parts, ignore_index=True)
+    truth = {"fps": FPS, "n_frames": per * n_shots, "n_shots": n_shots,
+             "release_s": [3.5 + k * DURATION_S for k in range(n_shots)],
+             "draw_hand": "right"}
+    return out, truth

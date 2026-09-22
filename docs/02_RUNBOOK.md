@@ -52,6 +52,21 @@ Version numbers increment. No report is ever overwritten.
 
 ---
 
+## Tuning phase detection (S4)
+
+Thresholds live in `config/phase_rules.yaml`. Tune them from data, not by eye:
+
+1. `archery run --video ... --to S5`
+2. Open `runs\<run_id>\04_phases.json` and read `signal_summary`: the
+   percentiles of every signal S4 uses, measured on your footage.
+3. If no shot was detected, compare `anchor_distance_norm.p1` (how close the
+   draw hand actually gets to the face) with `anchor_distance_enter`.
+4. Edit the threshold and rerun with `--from S4`. Pose estimation is not
+   repeated: each step's cache key covers only the config it reads.
+
+A phase the signals cannot support is written as `detected: false` with a
+reason, never with a guessed boundary. `checks_S4.json` lists every one.
+
 ## Day-to-day commands
 
 | Need | Command |

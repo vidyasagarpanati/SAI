@@ -46,15 +46,48 @@ def _hash_files(paths) -> str:
     return h.hexdigest()
 
 
-def compute_input_hash(state: RunState, step_id: str) -> str:
-    """Invalidate a step when the config, the video, or any upstream output changes."""
+# What each step actually consumes. A step's cache key is built ONLY from these,
+# so editing phase_rules.yaml re-runs S4 onward but never pose estimation, and
+# editing the athlete's name never re-decodes the video.
+#   steps   : upstream steps whose OUTPUT hashes feed this step
+#   config  : config slices (see Config.slice_hash)
+#   session : session.json fields this step reads
+STEP_DEPS: dict[str, dict[str, list[str]]] = {
+    "S0": {"steps": [], "config": [], "session": ["*"]},
+    "S1": {"steps": [], "config": ["frames"], "session": []},
+    "S2": {"steps": ["S1"], "config": ["pose", "paths.pose_model_file",
+                                       "quality_gates"], "session": []},
+    "S3": {"steps": ["S1", "S2"], "config": ["quality_gates", "smoothing"],
+           "session": ["draw_hand"]},
+    "S4": {"steps": ["S1", "S3"], "config": ["phase_rules", "quality_gates"],
+           "session": ["manual_phase_overrides", "number_of_shots_expected"]},
+    "S5": {"steps": ["S0", "S2", "S3", "S4"], "config": ["stats", "benchmarks",
+                                                        "quality_gates"], "session": []},
+    "S6": {"steps": ["S1", "S3", "S4", "S5"], "config": ["render"], "session": []},
+    "S7": {"steps": ["S0", "S1", "S3", "S4"], "config": ["video"], "session": []},
+    "S8": {"steps": ["S5", "S6"], "config": ["llm"], "session": []},
+    "S9": {"steps": ["S5", "S8"], "config": ["llm", "benchmarks"], "session": []},
+    "S10": {"steps": ["S0", "S5", "S6", "S8", "S9"], "config": ["render"], "session": []},
+}
+
+
+def compute_input_hash(ctx: Context, step_id: str) -> str:
+    """Cache key for one step: the video, its config slice, the session fields it
+    reads, and the output hashes of the upstream steps it consumes."""
+    import json
+    state = ctx.state
+    deps = STEP_DEPS[step_id]
     h = hashlib.sha256()
-    h.update(str(state.data.get("config_hash")).encode())
-    h.update(str(state.data.get("video_sha256")).encode())
     h.update(step_id.encode())
-    for prior in STEP_ORDER[:STEP_ORDER.index(step_id)]:
-        rec = state.data["steps"].get(prior, {})
-        h.update(str(rec.get("output_hash")).encode())
+    h.update(str(state.data.get("video_sha256")).encode())
+    h.update(ctx.cfg.slice_hash(deps["config"]).encode())
+    if deps["session"] == ["*"]:
+        session_part = ctx.session
+    else:
+        session_part = {k: ctx.session.get(k) for k in deps["session"]}
+    h.update(json.dumps(session_part, sort_keys=True, default=str).encode())
+    for up in deps["steps"]:
+        h.update(str(state.data["steps"].get(up, {}).get("output_hash")).encode())
     return h.hexdigest()[:16]
 
 
@@ -69,7 +102,7 @@ def execute_step(ctx: Context, step_id: str, force: bool = False) -> StepResult:
             f"Fix the upstream step, or rerun with --from that step."
         )
 
-    input_hash = compute_input_hash(state, step_id)
+    input_hash = compute_input_hash(ctx, step_id)
     if not force and state.should_skip(step_id, input_hash):
         rec = state.record(step_id)
         result = StepResult(step=step_id, outputs=rec.get("outputs", {}),

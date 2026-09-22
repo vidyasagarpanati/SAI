@@ -64,6 +64,23 @@ class Config:
     paths: Paths
     config_hash: str
 
+    def slice_hash(self, keys: list[str]) -> str:
+        """Hash only the configuration a step reads.
+
+        Keys are dotted paths into pipeline.yaml, or the whole-file names
+        "phase_rules" and "benchmarks". Changing a phase threshold must not
+        invalidate pose estimation, so each step hashes its own slice.
+        """
+        picked = {}
+        for key in sorted(keys):
+            if key == "phase_rules":
+                picked[key] = self.phase_rules
+            elif key == "benchmarks":
+                picked[key] = self.benchmarks
+            else:
+                picked[key] = self.get(key)
+        return sha256_text(_canonical(picked))[:16]
+
     def get(self, dotted: str, default=None):
         node: Any = self.pipeline
         for part in dotted.split("."):
