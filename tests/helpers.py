@@ -49,6 +49,7 @@ def make_run(run_dir: Path, df, fps: float, session: dict | None = None,
     if frames:
         write_frames(run_dir, n, frames)
     cfg = load_config(ROOT)
+    cfg.pipeline["llm"]["retry_backoff_base_s"] = 0     # no waiting in tests
     if outputs_dir:
         cfg.paths.outputs_dir = outputs_dir
     return Context(cfg=cfg, run_id=run_dir.name, run_dir=run_dir,

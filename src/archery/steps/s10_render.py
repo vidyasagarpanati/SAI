@@ -34,6 +34,14 @@ from archery.steps.s06_annotate import render_key_frame
 from archery.versioning import next_versioned, safe
 
 NP = "NOT PROVIDED - CANNOT BE CONFIRMED"
+# report-section key -> the narrative call that fills it
+SECTION_SOURCE = {"s01": "s01_executive", "s02": "s02_quality", "s03": "s04_phase",
+                  "s04": "s04_phase", "s05": "s05_biomech", "s06": "s06_consistency",
+                  "s08": "s08_equipment", "s09": "s09_errors", "s10": "s10_injury",
+                  "s11": "s11_framework", "s12": "s12_scorecard", "s13": "s13_strengths",
+                  "s14": "s14_weaknesses", "s15": "s15_priorities",
+                  "s16": "s16_training_coaching", "s17": "s16_training_coaching",
+                  "s18": "s18_projection_final", "s19": "s18_projection_final"}
 NICE = {"elbow_bow_deg": "Bow elbow angle", "elbow_draw_deg": "Draw elbow angle",
         "shoulder_bow_deg": "Bow shoulder angle", "shoulder_draw_deg": "Draw shoulder angle",
         "wrist_bow_deg": "Bow wrist angle", "wrist_draw_deg": "Draw wrist angle",
@@ -63,8 +71,19 @@ def build_view(ctx: Context, version_label: str) -> tuple[dict, int, int]:
     m = ctx.read_json("05_metrics.json")
     ver = ctx.read_json("09_verification.json")
     narr_raw = json.loads((ctx.narrative_dir / "all_sections.json").read_text(encoding="utf-8"))
+    status_path = ctx.narrative_dir / "section_status.json"
+    status = json.loads(status_path.read_text(encoding="utf-8")) if status_path.is_file() else {}
     ev = m["evidence_index"]
     n = substitute_all(narr_raw, ev)
+
+    def _why(call_id: str) -> str:
+        st = status.get(call_id) or {}
+        classes = ", ".join(st.get("classes") or []) or "not produced"
+        first = (st.get("problems") or ["no further detail recorded"])[0]
+        return f"{classes}: {first}"
+
+    failed_sections = {key: _why(src) for key, src in SECTION_SOURCE.items()
+                       if src not in n or (src == "s04_phase" and not n.get(src))}
     sess, athlete = m["session"], m["session"]["athlete"]
     units = m["measure_units"]
 
@@ -99,6 +118,9 @@ def build_view(ctx: Context, version_label: str) -> tuple[dict, int, int]:
     max_w = int(ctx.cfg.get("render.max_embedded_frame_width", 1280))
     qual = int(ctx.cfg.get("render.jpeg_quality_embed", 85))
     s04 = n.get("s04_phase", {})
+    failed_phases = {ph: _why(f"s04_phase/{ph}") for ph in
+                     {p["phase"] for sh in m["phase_timeline"] for p in sh["phases"] if p["detected"]}
+                     if ph not in s04}
     phases, frame_rows, n_img, n_missing = [], [], 0, 0
     for code in ORDER:
         occurrences = [(sh, p) for sh in m["phase_timeline"] for p in sh["phases"] if p["phase"] == code]
@@ -112,6 +134,8 @@ def build_view(ctx: Context, version_label: str) -> tuple[dict, int, int]:
             phases.append(entry)
             continue
         out = s04.get(code, {})
+        if code in failed_phases:
+            entry["failed"] = failed_phases[code]
         entry.update(analysis=out.get("analysis", []), coaching=out.get("coaching_implication"),
                      criteria=out.get("criteria_groups", []),
                      timing="; ".join(f"shot {sh['shot']}: {p['start_t_s']}-{p['end_t_s']} s "
@@ -197,12 +221,13 @@ def build_view(ctx: Context, version_label: str) -> tuple[dict, int, int]:
     # Section 11 and 12 display names; Section 9/15 timestamps from keys
     cat_name = dict(CATEGORIES)
     framework = [dict(c, label=f"{c['category']}. {cat_name[c['category']]}")
-                 for c in sorted(n["s11_framework"]["categories"], key=lambda c: c["category"])]
-    for p in n["s12_scorecard"]["phases"]:
+                 for c in sorted(n.get("s11_framework", {}).get("categories", []),
+                                 key=lambda c: c["category"])]
+    for p in n.get("s12_scorecard", {}).get("phases", []):
         p["phase_name"] = DISPLAY.get(p["phase"], p["phase"])
-    for e in n["s09_errors"]["errors"]:
+    for e in n.get("s09_errors", {}).get("errors", []):
         e["timestamp"] = format_value(ev[e["timestamp_key"]]) if e["timestamp_key"] in ev else "—"
-    for p in n["s15_priorities"]["priorities"]:
+    for p in n.get("s15_priorities", {}).get("priorities", []):
         p["timestamp"] = format_value(ev[p["timestamp_key"]]) if p["timestamp_key"] in ev else "—"
         p["shot_phase"] = DISPLAY.get(p["shot_phase"], p["shot_phase"])
 
@@ -237,13 +262,14 @@ def build_view(ctx: Context, version_label: str) -> tuple[dict, int, int]:
         "run_id": ctx.run_id, "order": report_order(ctx.cfg.get("report.physio_placement", "inline")),
         "info": info, "pre_basic": pre_basic, "pre_video": pre_video,
         "additional": athlete.get("additional_data") or [],
-        "n": n, "overall_score": n["s12_scorecard"]["overall_technique"]["score"],
+        "n": n, "overall_score": (n.get("s12_scorecard", {}).get("overall_technique") or {}).get("score"),
         "quality_rows": quality_rows, "overall_conf": q["overall_analysis_confidence"],
         "overall_rule": q["overall_confidence_rule"],
         "frame_rows": frame_rows, "phases": phases, "stats_rows": stats_rows,
         "timing_rows": timing_rows, "rankings": rankings, "bench_rows": bench_rows,
         "bench_rejected": bench_rejected, "framework": framework,
-        "n_strengths": len(n["s13_strengths"]["items"]), "conf_counts": counts,
+        "n_strengths": len(n.get("s13_strengths", {}).get("items", [])), "conf_counts": counts,
+        "failed": failed_sections, "partial": bool(failed_sections or failed_phases),
         "checklist": ver["checklist"], "physio": physio, "provenance": provenance,
         "generated": dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
     }
@@ -259,15 +285,23 @@ def run(ctx: Context) -> StepResult:
     from jinja2 import Environment, FileSystemLoader, select_autoescape
     res = StepResult(step="S10")
     ver = ctx.read_json("09_verification.json")
+    allow_partial = bool(ctx.cfg.get("report.allow_partial", True))
+    can_publish = bool(ver.get("passed")) or (allow_partial and ver.get("sections_available"))
     res.check("verification_passed", bool(ver.get("passed")),
-              "S9 passed." if ver.get("passed") else "S9 did not pass; refusing to publish an unverified report.")
-    if not ver.get("passed"):
+              "S9 passed." if ver.get("passed") else
+              (f"S9 did not pass; publishing a PARTIAL report with "
+               f"{len(ver.get('missing_sections') or [])} section(s) marked NOT AVAILABLE."
+               if can_publish else "S9 did not pass and nothing could be published."),
+              severity="WARN" if can_publish else "FAIL")
+    if not can_publish:
         return res
 
     session = ctx.read_json("00_ingest.json")["session"]
     date = session.get("session_date") if isinstance(session.get("session_date"), str) and \
         len(session.get("session_date")) == 10 else dt.date.today().isoformat()
     stem = f"Archery_Report_{safe(session.get('athlete_name', 'Athlete'))}_{date.replace('-', '')}"
+    if not ver.get("passed"):
+        stem += "_PARTIAL"
     target = next_versioned(guarded_path(ctx.cfg.paths.outputs_dir), stem, ".html")
     label = re.search(r"_v(\d+)\.html$", target.name).group(0)[1:-5]
 
@@ -311,5 +345,10 @@ def run(ctx: Context) -> StepResult:
 
     res.outputs["report"] = str(target)
     res.outputs["sha256"] = str(target.with_suffix(".html.sha256"))
-    res.stats = {"report": target.name, "size_mb": round(len(html) / 1e6, 2), "images": n_img}
+    res.check("partial_sections_marked", True,
+              f"{len(view['failed'])} section(s) marked NOT AVAILABLE in the report."
+              if view["failed"] else "Every section rendered.",
+              severity="WARN" if view["failed"] else "FAIL" if False else "WARN")
+    res.stats = {"report": target.name, "size_mb": round(len(html) / 1e6, 2), "images": n_img,
+                 "partial": view["partial"], "sections_not_available": len(view["failed"])}
     return res

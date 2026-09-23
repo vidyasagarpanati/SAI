@@ -122,6 +122,9 @@ def schema_for(sid: str, ctx: dict) -> dict:
     S_ENUM = _ref_enum(ids["strengths"])
     WE_ENUM = _ref_enum(ids["weaknesses"] + ids["errors"])
     E_ITEMS = arr(enum(ids["errors"])) if ids["errors"] else arr(STR, 0, 0)
+    ID_ENUM = {"s09_errors": enum([f"E{i}" for i in range(1, 13)]),
+               "s13_strengths": enum([f"S{i}" for i in range(1, 11)]),
+               "s14_weaknesses": enum([f"W{i}" for i in range(1, 11)])}.get(sid, STR)
     if sid == "s02_quality":
         return obj(camera_angle=STR, lighting=STR, athlete_visibility=STR, occlusion=STR,
                    motion_blur=STR, clothing_interference=STR, limitations=arr(STR, 1, 8))
@@ -147,7 +150,7 @@ def schema_for(sid: str, ctx: dict) -> dict:
         return obj(items=arr(obj(aspect=enum(aspects), classification=enum(["VISIBLE", "INFERRED", "NOT ASSESSABLE"]),
                                  observation=STR, confidence=enum(CONF)), 10, 10))
     if sid == "s09_errors":
-        return obj(errors=arr(obj(id=STR, rank=INT, error=STR, phase=enum(phases), timestamp_key=STR,
+        return obj(errors=arr(obj(id=ID_ENUM, rank=INT, error=STR, phase=enum(phases), timestamp_key=STR,
                                   evidence=STR, cause=STR, biomechanical_effect=STR,
                                   performance_effect=STR, severity=enum(SEV), correction=STR,
                                   confidence=enum(CONF), evidence_keys=KEYS), 0, 12))
@@ -165,11 +168,11 @@ def schema_for(sid: str, ctx: dict) -> dict:
                    shot_consistency=sc, biomechanical_efficiency=sc, movement_stability=sc,
                    overall_technique=sc)
     if sid == "s13_strengths":
-        return obj(items=arr(obj(id=STR, strength=STR, evidence=STR, biomechanical_reason=STR,
+        return obj(items=arr(obj(id=ID_ENUM, strength=STR, evidence=STR, biomechanical_reason=STR,
                                  performance_benefit=STR, maintenance_strategy=STR,
                                  confidence=enum(CONF), evidence_keys=KEYS), 0, 10))
     if sid == "s14_weaknesses":
-        return obj(items=arr(obj(id=STR, rank=INT, weakness=STR, evidence=STR, likely_cause=STR,
+        return obj(items=arr(obj(id=ID_ENUM, rank=INT, weakness=STR, evidence=STR, likely_cause=STR,
                                  performance_consequence=STR, correction=STR, priority=enum(CONF),
                                  confidence=enum(CONF), evidence_keys=KEYS, related_errors=E_ITEMS), 0, 10))
     if sid == "s15_priorities":

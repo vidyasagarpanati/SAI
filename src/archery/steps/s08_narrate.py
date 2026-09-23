@@ -26,9 +26,17 @@ def run(ctx: Context) -> StepResult:
               "Key frames sent to the model." if nar.vision else
               "Model lacks vision (or disabled): image-dependent observations are marked "
               "NOT RELIABLY ASSESSABLE.", severity=WARN)
-    res.check("all_sections_pass_self_checks", not summary["failed"],
-              "All sections passed schema, grounding and section rules." if not summary["failed"] else
-              "; ".join(f"{k}: {v[:3]}" for k, v in summary["failed"].items()))
+    allow_partial = bool(ctx.cfg.get("report.allow_partial", True))
+    failed = summary["failed"]
+    res.check("all_sections_pass_self_checks", not failed,
+              "All sections passed schema, grounding and section rules." if not failed else
+              f"{len(failed)} section(s) failed after {nar.max_retries + 1} attempts "
+              f"({summary['classes']}). They will render as NOT AVAILABLE in a PARTIAL report: "
+              + "; ".join(f"{k}: {v[0][:110]}" for k, v in list(failed.items())[:4]),
+              severity=WARN if allow_partial else "FAIL")
+    res.check("narrative_produced", bool(nar.outputs),
+              f"{len(nar.outputs)} section(s) available for the report." if nar.outputs else
+              "No section could be produced; there is nothing to report.")
     res.check("restated_values_linked", summary["auto_linked"] == 0,
               f"{summary['auto_linked']} restated evidence value(s) were linked back to their keys "
               f"automatically; see 08_narrative/auto_links.json.", severity=WARN)
@@ -39,5 +47,7 @@ def run(ctx: Context) -> StepResult:
     res.stats = {"sections": len(nar.outputs), "calls": usage.get("calls"),
                  "cached": usage.get("cached"), "prompt_tokens": usage.get("prompt_tokens"),
                  "completion_tokens": usage.get("completion_tokens"),
-                 "retries": summary["retries"], "auto_linked": summary["auto_linked"]}
+                 "retries": summary["retries"], "auto_linked": summary["auto_linked"],
+                 "failed_sections": sorted(summary["failed"]), "failure_classes": summary["classes"],
+                 "minutes": round(usage.get("wall_seconds", 0) / 60, 1)}
     return res

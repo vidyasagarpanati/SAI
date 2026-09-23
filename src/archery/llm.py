@@ -71,7 +71,7 @@ class OllamaClient:
         return self._caps
 
     def chat_json(self, system: str, user: str, schema: dict,
-                  images: list[bytes] | None = None) -> dict:
+                  images: list[bytes] | None = None, attempt: int = 0) -> dict:
         import httpx
         opts = {"temperature": float(self.cfg.get("llm.temperature", 0.0)),
                 "seed": int(self.cfg.get("llm.seed", 0)),
@@ -82,6 +82,7 @@ class OllamaClient:
         key = hashlib.sha256(json.dumps({
             "model": self.model, "opts": opts, "think": think, "system": system, "user": user,
             "schema": schema, "images": [hashlib.sha256(b).hexdigest() for b in images or []],
+            "attempt": attempt,
         }, sort_keys=True).encode()).hexdigest()
         cache = self.cache_dir / f"{key[:32]}.json"
         if cache.is_file():
@@ -151,7 +152,7 @@ class FakeLLM:
     def capabilities(self) -> set[str]:
         return {"completion", "vision"} if self.vision else {"completion"}
 
-    def chat_json(self, system, user, schema, images=None) -> dict:
+    def chat_json(self, system, user, schema, images=None, attempt: int = 0) -> dict:
         sid = re.search(r"SECTION: (\w+)", user).group(1)
         phase = (re.search(r"PHASE: (\w+)", user) or [None, None])[1]
         keys = re.findall(r"^\{\{([\w.\-]+)\}\} = ", user, flags=re.M)

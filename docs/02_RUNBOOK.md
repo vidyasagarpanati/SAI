@@ -140,6 +140,34 @@ nothing.
 If a step is skipped as unchanged it prints nothing and shows `-` for its
 duration in the table. That is the resume cache doing its job.
 
+## When a section cannot be produced
+
+The narrative step never leaves you with nothing. A section that fails every
+attempt is dropped, and the report is published as
+`Archery_Report_<athlete>_<date>_PARTIAL_vNN.html` with that section rendered as
+NOT AVAILABLE, naming the failure class and the offending text. Nothing is
+invented to fill the gap. Set `report.allow_partial: false` in
+`config/pipeline.yaml` to require a complete report instead.
+
+Failure classes, reported separately in the S8 summary and in
+`08_narrative/section_status.json`:
+
+| Class | Meaning | Usual fix |
+|---|---|---|
+| TRANSPORT | reply cut off, unparseable, or Ollama unreachable | raise `llm.num_predict`, check Ollama |
+| SCHEMA | valid JSON, wrong shape | usually a knock-on from an earlier failed section |
+| GROUNDING | typed number or unknown evidence key | rerun; if it repeats, the wording in `config/prompts` needs work |
+| RULE | section rule broken (ids, counts, coverage, diagnostic language) | check that section's rules |
+
+Retries escalate: each attempt restates the problems, demands a shorter answer,
+and the final attempt asks for the smallest valid answer. Waits between attempts
+back off exponentially (`llm.retry_backoff_base_s`, capped by
+`llm.retry_backoff_max_s`). Each attempt is a genuinely new call, never a cached
+repeat of the rejected one.
+
+S9 only re-tries what it alone can see (cross-section inconsistencies). Sections
+S8 already exhausted are left alone rather than burning another round of calls.
+
 ## Day-to-day commands
 
 | Need | Command |

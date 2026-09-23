@@ -33,6 +33,9 @@ td.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
 .frame img{width:100%;height:auto;border-radius:6px;border:1px solid var(--line)}
 .frame .cap{font-size:12.5px;color:var(--muted);margin-top:4px}
 .noframe{background:#eceff3;border:1px dashed #b9c0cc;color:#5a6270;text-align:center;padding:38px 12px;border-radius:6px;font-weight:600;margin:10px 0}
+.na-box{background:#fdf3f2;border:1px solid #f0c5c0;border-radius:8px;padding:18px;margin:8px 0}
+.na-box b{color:var(--lo)}
+.banner{background:#fff4e5;border:1px solid #f0d3a5;border-left:6px solid var(--me);border-radius:8px;padding:14px 18px;margin:18px 0}
 .phase{border-left:6px solid var(--accent);padding-left:14px;margin:22px 0}
 .prio{border:1px solid var(--line);border-radius:8px;padding:12px 16px;margin:12px 0}
 .score{font-weight:700;font-size:15px}
@@ -54,6 +57,11 @@ footer{color:var(--muted);font-size:12px;text-align:center;margin-top:30px}
 </header>
 <nav>{% for s in v.order %}<a href="#sec-{{ s.key }}">{{ s.number }}. {{ s.title|title }}</a>{% endfor %}</nav>
 <main>
+{% if v.partial %}
+<div class="banner"><b>PARTIAL REPORT.</b> {{ v.failed|length }} section(s) could not be produced
+and are marked NOT AVAILABLE below, with the reason. Every other section is complete and verified.
+Nothing has been guessed to fill a gap. See Section 20 for the verification record.</div>
+{% endif %}
 
 <section id="sec-info">
   <h2>ATHLETE / SESSION INFORMATION</h2>
@@ -72,7 +80,13 @@ footer{color:var(--muted);font-size:12px;text-align:center;margin-top:30px}
 <h2>{{ s.number }}. {{ s.title }}</h2>
 {% set k = s.key %}
 
-{% if k == "s01" %}{% set e = v.n.s01_executive %}
+{% if v.failed.get(k) %}
+  <div class="na-box"><b>NOT AVAILABLE (section failed).</b>
+  This section could not be produced after all attempts. Reason: {{ v.failed[k] }}.
+  It is left empty rather than filled with unverified content. Rerun with
+  <code>archery run --video &lt;path&gt; --from S8</code> to try again.</div>
+
+{% elif k == "s01" %}{% set e = v.n.s01_executive %}
   <table>
   <tr><th style="width:32%">Estimated technical level</th><td>{{ txt(e.technical_level) }}</td></tr>
   <tr><th>Overall technique score</th><td>{{ score(v.overall_score) }} <span class="na">(from Section 12)</span></td></tr>
@@ -101,7 +115,12 @@ footer{color:var(--muted);font-size:12px;text-align:center;margin-top:30px}
   {% for p in v.phases %}
   <div class="phase" style="border-color:{{ p.color }}">
     <h3>Phase {{ p.badge }}: {{ p.name }}</h3>
-    {% if p.detected %}
+    {% if p.detected and p.failed %}
+      <div class="na-box"><b>ANALYSIS NOT AVAILABLE.</b> The phase was extracted and measured, but
+      its written analysis could not be produced. Reason: {{ p.failed }}.</div>
+      <p class="na">{{ p.timing }}</p>
+      {% for f in p.frames %}<div class="frame"><img alt="Annotated key frame, shot {{ f.shot }}, {{ p.name }}" src="data:image/jpeg;base64,{{ f.b64 }}"><div class="cap">Shot {{ f.shot }} &middot; t = {{ f.t }} s &middot; frame {{ f.frame }}</div></div>{% endfor %}
+    {% elif p.detected %}
       <p class="na">{{ p.timing }} &middot; criteria applied: {{ p.criteria|join(", ") }}</p>
       <ul>{% for a in p.analysis %}<li>{{ lvl(a.evidence_level) }}{{ conf(a.confidence) }} {{ txt(a.point) }}</li>{% endfor %}</ul>
       {% for f in p.frames %}<div class="frame"><img alt="Annotated key frame, shot {{ f.shot }}, {{ p.name }}" src="data:image/jpeg;base64,{{ f.b64 }}"><div class="cap">Shot {{ f.shot }} &middot; t = {{ f.t }} s &middot; frame {{ f.frame }}</div></div>{% endfor %}

@@ -26,6 +26,14 @@ from archery.context import Context
 from archery.contracts import WARN, StepResult
 
 NOT_ASSESSABLE = "NOT RELIABLY ASSESSABLE FROM AVAILABLE VIDEO"
+WORDS = {0: "no", 1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six",
+         7: "seven", 8: "eight", 9: "nine", 10: "ten"}
+
+
+def _w(n: int) -> str:
+    """Spell small numbers. Status strings travel into the model's prompt; a
+    digit there gets quoted back and then rejected as an ungrounded number."""
+    return WORDS.get(int(n), str(n))
 INDIVIDUAL = "Individualized assessment required"
 
 # measure -> (units, decimals, is_ratio_scale). CV is only meaningful for
@@ -205,7 +213,7 @@ def run(ctx: Context) -> StepResult:
     enough = n_shots >= min_shots
     suppressed_reason = (None if enough else
                          f"{NOT_ASSESSABLE} (shot-to-shot variation requires at least "
-                         f"{min_shots} shots; {n_shots} detected)")
+                         f"{_w(min_shots)} shots; {_w(n_shots)} detected)")
     phase_codes = [p["phase"] for p in phases["shots"][0]["phases"]] if phases["shots"] else []
     cross: dict[str, dict] = {}
     timing: dict[str, dict] = {}

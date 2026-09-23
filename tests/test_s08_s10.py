@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import re
+from pathlib import Path
 
 import pytest
 
@@ -117,19 +118,67 @@ def test_fabricated_number_is_caught_and_regenerated(tmp_path):
 
 
 class _AlwaysFabricates(FakeLLM):
-    def chat_json(self, system, user, schema, images=None):
-        out = super().chat_json(system, user, schema, images)
+    def chat_json(self, system, user, schema, images=None, attempt=0):
+        out = super().chat_json(system, user, schema, images, attempt)
         if "SECTION: s13_strengths" in user:
             out["items"][0]["evidence"] = "Bow elbow held at 171.9 degrees throughout."
         return out
 
 
-def test_persistent_fabrication_blocks_the_report(tmp_path):
+def test_persistent_fabrication_degrades_to_a_partial_report(tmp_path):
+    """With report.allow_partial (the default) a section that cannot be produced
+    is dropped and marked, instead of killing the run."""
     ctx = _prepare(tmp_path, "block")
     ctx.llm = _AlwaysFabricates()
     r8 = s08_narrate.run(ctx)
-    assert not r8.passed
-    assert any("171.9" in c.detail for c in r8.failures)
+    assert r8.passed, [f"{c.name}: {c.detail}" for c in r8.failures]
+    warn = [c for c in r8.warnings if c.name == "all_sections_pass_self_checks"]
+    assert warn and "171.9" in warn[0].detail
+    status = json.loads((ctx.narrative_dir / "section_status.json").read_text())
+    assert status["s13_strengths"]["status"] == "FAILED"
+    assert status["s13_strengths"]["classes"] == ["GROUNDING"]
+    saved = json.loads((ctx.narrative_dir / "all_sections.json").read_text())
+    assert "s13_strengths" not in saved
+
+
+def test_partial_report_is_published_and_marked(tmp_path):
+    ctx = _prepare(tmp_path, "partial")
+    ctx.llm = _AlwaysFabricates()
+    assert s08_narrate.run(ctx).passed
+    s09_verify.run(ctx)
+    r10 = s10_render.run(ctx)
+    assert r10.passed, [f"{c.name}: {c.detail}" for c in r10.failures]
+    report = Path(r10.outputs["report"])
+    assert "_PARTIAL_v" in report.name
+    html = report.read_text()
+    assert "PARTIAL REPORT." in html
+    assert "NOT AVAILABLE (section failed)" in html
+    assert "GROUNDING" in html          # the reason is shown, not hidden
+    assert "{{" not in html
+
+
+def test_retry_prompts_differ_so_a_cached_answer_is_not_reused(tmp_path):
+    """Retries used to repeat the identical prompt, hit the response cache and
+    return the identical rejected answer three times."""
+    from archery.narrator import Narrator
+    ctx = _prepare(tmp_path, "retry")
+    seen = []
+
+    class _Recorder(FakeLLM):
+        def chat_json(self, system, user, schema, images=None, attempt=0):
+            seen.append((attempt, user))
+            out = super().chat_json(system, user, schema, images, attempt)
+            if "SECTION: s05_biomech" in user and attempt < 2:
+                out["findings"][0]["finding"] = "Bow elbow at 123.4 degrees."
+            return out
+
+    ctx.llm = _Recorder()
+    nar = Narrator(ctx, llm=ctx.llm)
+    out, problems, attempts = nar.generate("s05_biomech", [], [])
+    assert attempts == 2 and not problems
+    s05 = [(a, u) for a, u in seen if "SECTION: s05_biomech" in u]
+    assert len({u for _, u in s05}) == len(s05), "each retry must send a different prompt"
+    assert "attempt 1 of" in s05[1][1] and "FINAL attempt" not in s05[1][1]
 
 
 def test_no_vision_model_gets_no_images(tmp_path):

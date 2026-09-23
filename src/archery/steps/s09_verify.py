@@ -15,7 +15,7 @@ import jsonschema
 
 from archery import grounding
 from archery.context import Context
-from archery.contracts import StepResult
+from archery.contracts import WARN, StepResult
 from archery.narrator import Narrator
 from archery.report_spec import (CALLS, MASTER, PRESCRIPTIVE, SKIP_FIELDS, local_checks,
                                  report_order, schema_for)
@@ -111,6 +111,10 @@ def run(ctx: Context) -> StepResult:
     res = StepResult(step="S9")
     nar = Narrator(ctx, llm=ctx.llm)
     nar.load_saved()
+    status_file = nar.dir / "section_status.json"
+    if status_file.is_file():
+        import json as _json
+        nar.status = _json.loads(status_file.read_text(encoding="utf-8"))
     repairs = []
     rounds = int(ctx.cfg.get("llm.max_retries_per_section", 2))
     deps_of = {sid: (deps, imgs) for sid, deps, imgs in CALLS}
@@ -124,36 +128,76 @@ def run(ctx: Context) -> StepResult:
                 combined.setdefault(k, []).extend(v)
         if not combined or rnd == rounds:
             break
+        exhausted = {k for k, st in nar.status.items()
+                     if st.get("status") == "FAILED" and st.get("attempts", 0) > rounds}
         for key, problems in combined.items():
+            # S8 already spent every attempt on these; repeating them here costs
+            # minutes and produces the same answer. Only cross-section findings,
+            # which S8 could not see, are worth another call.
+            if key in exhausted and key not in cross:
+                continue
             sid, _, ph = key.partition("/")
             deps, imgs = deps_of[sid]
             if sid == "s04_phase" and not ph:
                 continue
-            out, left, _ = nar.generate(sid, deps, imgs, phase=ph or None, extra_feedback=problems)
-            if ph:
-                nar.outputs[sid][ph] = out
+            out, left, attempts = nar.generate(sid, deps, imgs, phase=ph or None,
+                                               extra_feedback=problems)
+            if left:
+                # A repair that still fails is NOT accepted: storing it would put
+                # unverified text into the report. The section stays absent and is
+                # rendered as NOT AVAILABLE with its reason.
+                nar._record_failure(key, left, attempts)
+                if ph:
+                    nar.outputs.get(sid, {}).pop(ph, None)
+                    nar.save(f"s04_phase_{ph}", {"_status": "FAILED", "_problems": left})
+                else:
+                    nar.outputs.pop(sid, None)
+                    nar.save(sid, {"_status": "FAILED", "_problems": left})
+            elif ph:
+                nar.outputs.setdefault(sid, {})[ph] = out
+                nar.status[key] = {"status": "OK", "attempts": attempts + 1, "repaired": True}
                 nar.save(f"s04_phase_{ph}", out)
             else:
                 nar.outputs[sid] = out
+                nar.status[key] = {"status": "OK", "attempts": attempts + 1, "repaired": True}
                 nar.save(sid, out)
             repairs.append({"round": rnd + 1, "section": key, "problems": problems[:10],
                             "resolved": not left})
         nar.save("all_sections", nar.outputs)
+        nar.save("section_status", nar.status)
 
     checklist = _checklist(nar, sec, cross)
-    payload = {"passed": not combined and all(r["status"] == "PASS" for r in checklist),
+    missing = [sid for sid, _, _ in CALLS if sid not in nar.outputs] + \
+              [f"s04_phase/{ph}" for ph in nar.detected
+               if ph not in (nar.outputs.get("s04_phase") or {})]
+    complete = not combined and all(r["status"] == "PASS" for r in checklist) and not missing
+    payload = {"passed": complete,
+               "partial": bool(missing or combined) and bool(nar.outputs),
+               "allow_partial": bool(ctx.cfg.get("report.allow_partial", True)),
+               "sections_available": sorted(nar.outputs),
+               "missing_sections": missing,
                "checklist": checklist, "section_problems": sec, "cross_section_problems": cross,
                "repairs": repairs, "detected_phases": nar.detected}
     out = ctx.write_json("09_verification.json", payload)
 
+    partial_ok = payload["allow_partial"] and bool(nar.outputs)
+    sev = WARN if partial_ok else "FAIL"
     for row in checklist:
         res.check(row["check"], row["status"] == "PASS",
-                  "" if row["status"] == "PASS" else "See 09_verification.json for the offending text.")
+                  "" if row["status"] == "PASS" else
+                  "See 09_verification.json for the offending text.", severity=sev)
     for key, problems in combined.items():
-        res.check(f"section_{key}", False, "; ".join(problems[:5]))
+        res.check(f"section_{key}", False, "; ".join(problems[:5]), severity=sev)
+    res.check("narrative_available", bool(nar.outputs),
+              f"{len(nar.outputs)} section(s) verified." if nar.outputs else
+              "Nothing to verify: no section was produced.")
+    if missing:
+        res.check("all_sections_available", False,
+                  f"Rendering PARTIAL: missing {missing}", severity=sev)
     res.outputs["verification"] = str(out)
     res.outputs["narrative"] = str(nar.dir / "all_sections.json")
-    res.stats = {"passed": payload["passed"], "repairs": len(repairs),
+    res.stats = {"passed": payload["passed"], "partial": payload["partial"],
+                 "missing": len(missing), "repairs": len(repairs),
                  "checklist_pass": sum(r["status"] == "PASS" for r in checklist),
                  "checklist_total": len(checklist)}
     return res

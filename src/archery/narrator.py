@@ -22,6 +22,32 @@ from archery.report_spec import (CALLS, PRESCRIPTIVE, SKIP_FIELDS, build_prompt,
                                  schema_for, valid_ids)
 
 EVIDENCE_LINE = re.compile(r"^\{\{([\w.\-]+)\}\} = ", re.M)
+
+# Failure classes, reported separately so a run says WHAT kind of problem it hit.
+TRANSPORT = "TRANSPORT"      # unreachable, timeout, truncated or unparseable reply
+SCHEMA = "SCHEMA"            # valid JSON, wrong shape
+GROUNDING = "GROUNDING"      # typed number, unknown evidence key
+RULE = "RULE"                # section rule (ids, counts, coverage, banned language)
+
+
+def classify(problem: str) -> str:
+    if problem.startswith("schema:"):
+        return SCHEMA
+    if "was Model reply" in problem or "cut off" in problem:
+        return TRANSPORT
+    if "evidence" in problem or "typed outside" in problem or "braces" in problem:
+        return GROUNDING
+    return RULE
+
+
+ESCALATION = {
+    1: "This is attempt two. Fix ONLY the problems listed and change nothing else.",
+    2: "This is attempt three. Be brief. Remove any sentence you cannot express with a "
+       "{{KEY}}; a shorter, correct section is better than a longer one.",
+    3: "FINAL attempt. Return the smallest valid answer that satisfies the schema and the "
+       "listed problems. Use NOT RELIABLY ASSESSABLE FROM AVAILABLE VIDEO wherever you "
+       "cannot cite evidence.",
+}
 NUMBER_HINT = ("Remove every typed number that is not a {{KEY}}: no thresholds, targets, "
                "approximations or restated values. Cite the {{KEY}} instead, or drop the number.")
 
@@ -67,6 +93,9 @@ class Narrator:
         self.outputs: dict = {}
         self.log: list[dict] = []
         self.links: list[str] = []
+        self.status: dict[str, dict] = {}
+        self.backoff_base = float(ctx.cfg.get("llm.retry_backoff_base_s", 1.0))
+        self.backoff_max = float(ctx.cfg.get("llm.retry_backoff_max_s", 30.0))
         self._frame_w = None
 
     # ------------------------------------------------------------ helpers
@@ -133,8 +162,12 @@ class Narrator:
                 sid, self.ctx.cfg.prompts, self.metrics, self.digest_view(), deps,
                 self.detected, phase, bool(images), self.limits)
             if feedback:
-                user += ("\n\nYOUR PREVIOUS ANSWER WAS REJECTED. Fix exactly these problems and "
-                         "change nothing else:\n- " + "\n- ".join(feedback[:15]))
+                user += (f"\n\nYOUR PREVIOUS ANSWER WAS REJECTED (attempt {attempt} of "
+                         f"{self.max_retries + 1}). {ESCALATION.get(attempt, '')}\n"
+                         f"Fix exactly these problems:\n- " + "\n- ".join(feedback[:15]))
+                delay = min(self.backoff_base * (2 ** (attempt - 1)), self.backoff_max)
+                if delay:
+                    _time.sleep(delay)
             est = len(system) + len(user)
             self.done_calls += 1
             head = (f"  S8 [{self.done_calls}/{self.total_calls or '?'}] {label}"
@@ -146,10 +179,10 @@ class Narrator:
                       f"({self.warn_tokens}); lower llm.max_evidence_lines", flush=True)
             started = _time.time()
             try:
-                out = self.llm.chat_json(system, user, schema, images)
+                out = self.llm.chat_json(system, user, schema, images, attempt=attempt)
             except Exception as exc:  # noqa: BLE001  (LLMBadOutput and transport errors)
-                from archery.llm import LLMBadOutput
-                if not isinstance(exc, LLMBadOutput):
+                from archery.llm import LLMBadOutput, LLMError
+                if not isinstance(exc, (LLMBadOutput, LLMError)):
                     raise
                 problems = [f"your answer was {exc}. Answer again with the SAME JSON structure "
                             f"but shorter text fields and fewer list items, and close every "
@@ -183,12 +216,16 @@ class Narrator:
                              "prompt_tokens": stats.get("prompt_tokens"),
                              "completion_tokens": stats.get("completion_tokens"),
                              "seconds": took, "cached": bool(stats.get("cached"))})
-            if any("typed outside" in p for p in problems):
-                problems = problems + [NUMBER_HINT]
+            hints = [NUMBER_HINT] if any("typed outside" in p for p in problems) else []
             if not problems:
                 return out, [], attempt
-            feedback = problems
+            feedback = problems + hints
         return out, problems, self.max_retries
+
+    def _record_failure(self, key: str, problems: list[str], attempts: int) -> None:
+        self.status[key] = {"status": "FAILED", "attempts": attempts + 1,
+                            "classes": sorted({classify(p) for p in problems}),
+                            "problems": problems[:10]}
 
     def _eta(self) -> str:
         if not self.call_seconds or not self.total_calls:
@@ -219,20 +256,30 @@ class Narrator:
                 per = {}
                 for ph in self.detected:
                     out, probs, att = self.generate(sid, deps, img_phases, phase=ph)
-                    per[ph] = out
                     retries += att
+                    key = f"s04_phase/{ph}"
                     if probs:
-                        failed[f"s04_phase/{ph}"] = probs
-                    self.save(f"s04_phase_{ph}", out)
+                        failed[key] = probs
+                        self._record_failure(key, probs, att)
+                        self.save(f"s04_phase_{ph}", {"_status": "FAILED", "_problems": probs})
+                    else:
+                        per[ph] = out
+                        self.status[key] = {"status": "OK", "attempts": att + 1}
+                        self.save(f"s04_phase_{ph}", out)
                 self.outputs[sid] = per
                 continue
             out, probs, att = self.generate(sid, deps, img_phases)
             retries += att
-            self.outputs[sid] = out
             if probs:
                 failed[sid] = probs
+                self._record_failure(sid, probs, att)
+                self.save(sid, {"_status": "FAILED", "_problems": probs})
+                continue          # the section is left out; dependants degrade gracefully
+            self.outputs[sid] = out
+            self.status[sid] = {"status": "OK", "attempts": att + 1}
             self.save(sid, out)
         self.save("all_sections", self.outputs)
+        self.save("section_status", self.status)
         self.save("generation_log", self.log)
         self.save("auto_links", self.links)
         usage = dict(getattr(self.llm, "usage", {}))
@@ -244,7 +291,17 @@ class Narrator:
               f"({usage['calls']} calls, {usage['cached']} cached, "
               f"{usage['prompt_tokens']}+{usage['completion_tokens']} tokens)", flush=True)
         self.save("usage", usage)
-        return {"failed": failed, "retries": retries, "usage": usage, "auto_linked": len(self.links)}
+        classes: dict[str, int] = {}
+        for probs in failed.values():
+            for p in probs:
+                classes[classify(p)] = classes.get(classify(p), 0) + 1
+        if failed:
+            print(f"  S8: {len(failed)} section(s) could not be produced after "
+                  f"{self.max_retries + 1} attempts: {', '.join(sorted(failed))}", flush=True)
+            print(f"      failure classes: {classes}", flush=True)
+        return {"failed": failed, "retries": retries, "usage": usage,
+                "auto_linked": len(self.links), "classes": classes,
+                "status": self.status}
 
     def load_saved(self) -> None:
         self.outputs = json.loads((self.dir / "all_sections.json").read_text(encoding="utf-8"))

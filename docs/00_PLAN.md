@@ -277,3 +277,19 @@ Windows-specific implementation notes:
 - S10 re-renders key frames with verified coaching text; model text is
   HTML-escaped; report is refused if S9 did not pass.
 - `archery doctor --llm` makes one structured-output call to check the model.
+
+### Change log (2026-09-23, resilience)
+
+- Retries were a no-op: identical feedback produced an identical prompt, which
+  hit the response cache and returned the identical rejected answer. The attempt
+  number is now part of the cache key and each retry escalates its instructions,
+  with exponential backoff between attempts.
+- Failures are classified TRANSPORT / SCHEMA / GROUNDING / RULE and reported per
+  class, per section, in 08_narrative/section_status.json.
+- Partial reports: a section that cannot be produced is rendered as NOT AVAILABLE
+  with its reason, the file is marked PARTIAL, and the run completes. S9 never
+  accepts a repair that still fails, so unverified text cannot reach the report.
+- Our own status strings no longer contain digits ("requires at least three
+  shots"): the model quoted them back and the grounding check then rejected them.
+- Error, strength and weakness ids are schema enums (E1.., S1.., W1..), so
+  "err_01" is impossible.

@@ -37,6 +37,10 @@ stats:
   min_shots_for_sd: 3       # below this, SD and CV are suppressed, not estimated
 
 report:
+  # A section the model cannot produce after all attempts is rendered as
+  # "NOT AVAILABLE" with its reason, and the report is published marked PARTIAL,
+  # rather than producing nothing at all. Set false to require a complete report.
+  allow_partial: true
   # "inline" places the physiological sections 14 and 15 mid-report as in the
   # Kalpana example (decision D10); "appendix" keeps master-prompt numbering 1-20
   # and renders them as Appendix A and B after Section 20.
@@ -53,6 +57,8 @@ llm:
   num_predict: 4096   # hard cap on reply tokens per section
   request_timeout_s: 300
   max_retries_per_section: 3
+  retry_backoff_base_s: 1.0   # exponential: 1s, 2s, 4s ... between attempts
+  retry_backoff_max_s: 30.0
   # Prompt budget. The first real run sent ~15.9k-token prompts into a 16k
   # window, leaving no room for the reply. These caps keep prompts near 5-6k.
   max_evidence_lines: 70      # EVIDENCE entries per call

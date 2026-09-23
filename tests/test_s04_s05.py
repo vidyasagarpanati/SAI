@@ -127,8 +127,11 @@ def test_s5_single_shot_suppresses_cross_shot_sd(single):
     ctx, *_ = single
     m = json.loads((ctx.run_dir / "05_metrics.json").read_text())
     c = m["cross_shot"]["by_phase"]["AIM"]["elbow_bow_deg"]
-    assert c.get("sd") is None and "requires at least 3 shots" in c["status"]
-    assert "requires at least 3 shots" in m["consistency_rankings"]["status"]
+    # spelled out, not "3": digits in our own status text get quoted back by the
+    # model and then rejected by the grounding check as ungrounded numbers
+    assert c.get("sd") is None and "requires at least three shots" in c["status"]
+    assert "requires at least three shots" in m["consistency_rankings"]["status"]
+    assert not any(ch.isdigit() for ch in c["status"])
 
 
 def test_s5_three_shots_produce_cross_shot_stats(multi):
