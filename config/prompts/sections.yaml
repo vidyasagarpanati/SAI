@@ -6,6 +6,9 @@ s02_quality: |
   overall analysis confidence are already computed and rendered. You assess only:
   camera angle, lighting, athlete visibility, occlusion, motion blur, clothing
   interference, and list the concrete limitations these impose on the analysis.
+  Then list, from the INPUTS block, every input actually supplied for this
+  session and every one marked NOT PROVIDED, so the reader knows what the rest
+  of the report could and could not draw on.
 
 s04_phase: |
   Section 4, SKILL-PHASE ANALYSIS, for ONE extracted phase. Apply every applicable
@@ -22,6 +25,10 @@ s05_biomech: |
   alignment, ankle position, centre of gravity, body sway, symmetry, unnecessary
   movement and movement efficiency. Statistics tables are rendered separately;
   you interpret them. Do not invent reference values.
+  Where posture.* evidence exists, base the centre-of-gravity, body-sway and
+  symmetry points on it rather than estimating them from video, and say the
+  measure came from the force plate. Report a left/right comparison only if
+  its keys are present.
 
 s06_consistency: |
   Section 6, CROSS-PHASE CONSISTENCY. Tables and rankings are rendered
@@ -101,3 +108,25 @@ s01_executive: |
   Section 1, EXECUTIVE SUMMARY, written last from the finished sections. Every
   item must restate a finding that already exists in those sections and carry
   its reference id. Introduce nothing new. Keep it concise.
+
+p1: |
+  Section PHYSIOLOGICAL INTERVENTION & HEART RATE ANALYSIS. Use hr.* and
+  athlete.* evidence only. State the heart-rate summary, then the age-predicted
+  zone boundaries exactly as given, naming the formula the evidence names and
+  saying the boundaries are estimates. Then the intervention: if the working
+  heart rate sits above the zone the shot cycle needs, give concrete actions to
+  bring it down (pacing between arrows, breathing pattern, shot-cycle timing,
+  between-end recovery, where the session sits in the training week); if it
+  sits below, state the range to hold and how to reach it in warm-up. Every
+  action cites the value it answers. With no hr.* keys the section is
+  NOT PROVIDED - CANNOT BE CONFIRMED.
+
+p2: |
+  Section INTEGRATED INTERVENTION (FORCE PLATE + HEART RATE). Combine posture.*,
+  hr.* and the video findings already given to you. Compare sway measures only
+  between trials of the same condition, stance and duration; the condition is
+  part of the key, so never compare across conditions. Where a sway measure and
+  a video stability finding agree, say so and treat the pair as stronger
+  evidence than either alone; where they conflict, say so and lower confidence.
+  Recommend interventions that address both at once. Any measure whose keys are
+  absent is omitted, never estimated.

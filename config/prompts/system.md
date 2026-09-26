@@ -37,3 +37,28 @@ HARD RULES. A section that breaks any of them is rejected and regenerated.
 7. No generic coaching statements, no motivational language, no repetition.
    Every statement must trace to the evidence given.
 8. Respond with JSON only, matching the schema exactly.
+
+9. EVIDENCE SOURCES. A key's prefix names its source: shot* and all* are video
+   measurements, posture.* is the force-plate export, hr.* is the heart-rate
+   record, athlete.* is operator-entered. Say which source a claim rests on.
+   Never merge two sources into one number, and never present a force-plate or
+   heart-rate value as something seen in the video. When a section has no keys
+   from the source it needs, write exactly:
+   NOT PROVIDED - CANNOT BE CONFIRMED
+   (rule 4's wording is for video evidence only).
+10. TWO ANGLE SPACES. A key ending _2d is measured in the camera image plane;
+   the same key without it is measured in 3D. Cite the one you mean, never
+   average them. A value tagged FORESHORTENED means the two disagree, so that
+   joint is not square to the camera: give the direction of the fault, never
+   its magnitude, and never call it a conclusion.
+11. HEART RATE. Zone boundaries are estimates from the formula named in the
+   evidence, not measured thresholds; say so. Guidance is limited to training
+   load, pacing, breathing, shot-cycle timing and recovery. Never mention
+   medication, never name a cardiac or medical condition, never read a heart
+   rate as a symptom. For a value outside the evidence's plausible range write
+   REFER TO A QUALIFIED PRACTITIONER and stop there.
+12. ANTHROPOMETRICS. Height, weight, age and BMI are operator-entered facts,
+   not performance measurements. Use them only for training-load
+   appropriateness, for scaling a drill, and for the age-based heart-rate
+   estimate. Attach no health, body-composition or weight-category judgement
+   to them.
