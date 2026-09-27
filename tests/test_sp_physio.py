@@ -83,6 +83,23 @@ def test_channels_that_are_zero_everywhere_are_not_measurements():
         assert all(key not in t.values for t in export.trials)
 
 
+def test_xlsx_and_csv_read_identically(tmp_path):
+    """The coach exports either format; neither may be a different measurement."""
+    openpyxl = pytest.importorskip("openpyxl")
+    rows = list(csv.reader(open(SAMPLE, encoding="utf-8-sig")))
+    book = openpyxl.Workbook()
+    sheet = book.active
+    for row in rows:
+        sheet.append([float(c) if c.replace(".", "", 1).replace("-", "", 1).isdigit() else c
+                      for c in row])
+    out = tmp_path / "sample.xlsx"
+    book.save(out)
+    a, b = load(SAMPLE, "Samarth Kumar"), load(out, "Samarth Kumar")
+    assert a.subject == b.subject
+    assert sorted(a.unavailable) == sorted(b.unavailable)
+    assert [t.values for t in a.trials] == [t.values for t in b.trials]
+
+
 def test_comma_inside_a_notes_field_parses(tmp_path):
     rows = list(csv.DictReader(open(SAMPLE, encoding="utf-8-sig")))
     rows[0][META_COLUMNS["subject_notes"]] = "Recurve, 68 inch, 26 lb"

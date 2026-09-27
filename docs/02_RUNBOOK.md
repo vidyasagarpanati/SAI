@@ -258,3 +258,64 @@ check records what it looked at. Fix the cause, then rerun that step with
 
 **Frame count hit the cap.** `frames.max_frames` in `config/pipeline.yaml`. The
 default 20000 is a disk guard, not a quality limit.
+
+---
+
+## Supplying athlete and physiological inputs
+
+The flags only fill `session.json`; the file stays the single source of truth,
+and `run` persists them before the first step starts.
+
+Interactive, prompts field by field:
+
+```
+archery init-session --video "D:\Archery-InputData\Samarth.mov" --ask
+```
+
+Or in one line. Use `;` between fields, because multi-line quoting differs
+between cmd and PowerShell:
+
+```
+archery init-session --video "D:\Archery-InputData\Samarth.mov" --athlete "Samarth" ^
+  --profile "Height: 170 cms; Weight: 60 Kgs; Age: 16 years; Resting HR: 60 bpm; Average HR: 80 bpm" ^
+  --force-plate "D:\Archery-InputData\Samarth - Copy.xlsx"
+```
+
+Longer blocks go in a file, one field per line, with `--profile-file`. Plate
+report images attach with `--force-plate-image`, repeatable. `--yes` skips the
+confirmation for unattended runs. The same flags work on `run`.
+
+Recognised fields: Name, Height, Weight, Age, Resting HR, Average HR, Max HR,
+plus the obvious spellings (Ht, Wt, RHR, Avg HR, Peak HR). A value outside its
+plausible range is refused with the line quoted rather than clamped. Anything
+else on a line is kept as a note and never becomes evidence.
+
+Before any step runs you get the inventory back:
+
+```
+INPUTS UNDERSTOOD
+  athlete_name   Samarth
+  height_cm      170 cm
+  weight_kg      60 kg
+  age_y          16 years
+  hr_rest_bpm    60 bpm
+  hr_mean_bpm    80 bpm
+  hr_max_bpm     NOT PROVIDED
+  force_plate    Samarth - Copy.xlsx
+  plate_images   NOT PROVIDED
+```
+
+### Cost of changing an input
+
+SP is its own step, so a corrected export or a fixed typo re-runs SP, S5, S8,
+S9 and S10. Pose estimation, the key frames and the annotated video are served
+from cache. Run it alone with `archery run --video ... --only SP`.
+
+### What the force-plate export must contain
+
+One row per trial, the nineteen metadata columns of the Body Sway template
+(`Subject - Name`, `Upper Extremities`, `Duration [s]` and the rest), and the
+whitelisted measure columns. A renamed or missing column fails the step and
+names the column rather than guessing. An export holding several athletes is
+fine: rows are selected by `Subject - Name`, and a name matching none or more
+than one is refused with the candidates listed.

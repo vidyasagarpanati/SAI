@@ -354,7 +354,49 @@ Code work starts once these are settled.
 
 ---
 
+## Part 5 - What shipped
+
+Feature 2 is implemented. Feature 1, the angle accuracy work in Part 1, has not
+started.
+
+Decisions settled before the build: Tanaka for the age-predicted maximum, free
+text only for heart rate, athlete name printed but never a date of birth, and
+training-load guidance age-gated below eighteen. Taken as defaults and stated:
+BMI as a plain number with its formula, every plate condition reported with
+DRAW TO HOLD leading, plate images as figures with no numbers read from them.
+
+New and changed files:
+
+| File | What it does |
+|---|---|
+| `src/archery/profile_text.py` | Parses the free-text block. Rejects out-of-range values with the line quoted, keeps unmatched lines as notes. |
+| `src/archery/forceplate.py` | Reads the .csv or .xlsx export. Column contract, athlete selection, all-zero rule, condition grouping. |
+| `src/archery/steps/sp_physio.py` | Step SP. BMI, Tanaka zones, per-condition statistics, evidence keys, the input inventory. |
+| `src/archery/cli.py` | `--profile`, `--profile-file`, `--force-plate`, `--force-plate-image`, `--ask`, `--yes`, and the echo-back. |
+| `config/benchmarks.json` | First cited entries: Tanaka, the percentage-of-maximum zones, BMI, the youth threshold. |
+| `config/banned_phrases.txt` | Clinical and body-composition language, enforced on p1 as it already was on Section 10. |
+| `templates/report.html.j2` | p1 and p2 rendered from evidence instead of the placeholder strings. |
+| `tests/test_sp_physio.py` | 22 tests against the real export, including five end to end. |
+
+Verification, all passing (92 tests): header contract named by column, four
+athletes reduced to one, ambiguous and unknown names refused, channels that are
+zero everywhere never rendered as a value, a comma inside a notes field, .csv
+and .xlsx reading identically, conditions of different duration never sharing a
+key, SD withheld below the trial floor, BMI and Tanaka matching independently
+computed values, the estimate emitted at MEDIUM confidence, youth flagged,
+typed-versus-export conflicts reported rather than resolved, a run with no
+inputs producing no keys and no zeros, images alone producing no numbers, a
+broken export failing the step without writing evidence, editing the export
+re-running SP, physio edits not invalidating the video steps, the report never
+naming the other athletes or printing a date of birth, and no
+body-composition language anywhere in the HTML.
+
+Not built, by decision: the `time,bpm` heart-rate CSV reader (D1, free text
+first) and any reading of numbers out of a plate image (D5).
+
 ## Change log
 
+- 2026-09-27 Feature 2 implemented end to end. Step SP added between S0 and S1.
+  Feature 1 not started.
 - 2026-09-26 Prompt enhanced (Part 0). Force-plate sample analysed. Spec written.
   No code changed.
