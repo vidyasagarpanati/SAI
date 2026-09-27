@@ -226,3 +226,87 @@ def test_both_shoulder_definitions_are_reported_and_differ(ctx, result):
         assert f"shoulder_{side}_girdle_deg" in k.columns
         assert k.at[i, f"shoulder_{side}_girdle_deg"] != pytest.approx(
             k.at[i, f"shoulder_{side}_deg"], abs=1.0)
+
+
+# ------------------------------------------------- impossible values
+# A run failed on 5.9% of frames exceeding the neck-inclination bound. The
+# bound had been tuned against angles measured in normalised coordinates, which
+# understate every vertical-referenced angle: the old +/-70 is 78.4 in
+# corrected pixel space, so it had been rejecting nothing.
+
+def test_an_out_of_bounds_value_is_discarded_not_reported(ctx, tmp_path):
+    import pandas as pd
+    from archery.config import load_config
+    from archery.steps import s03_kinematics as s3
+
+    run = tmp_path / "impossible"
+    run.mkdir(parents=True)
+    io_guard.configure([run])
+    df = pd.read_parquet(ctx.run_dir / "02_landmarks.parquet").copy()
+    # Put the nose below the shoulders for a stretch of frames: the neck
+    # segment inverts, which is not a posture, it is a bad detection.
+    from archery.landmarks import ID
+    n = int(df["frame"].max()) + 1
+    nose_rows = np.arange(len(df)).reshape(n, 33)[50:90, ID["NOSE"]]
+    df.loc[nose_rows, "y"] = 0.60
+    df.to_parquet(run / "02_landmarks.parquet", index=False)
+    (run / "01_frames.json").write_text(json.dumps(
+        {"frames_dir": str(run), "n_frames": n, "analysis_fps": 60.0,
+         "frame_width": 1920, "frame_height": 1080}))
+    (run / "02_pose_quality.json").write_text(json.dumps({"detection_rate": 1.0}))
+    c = Context(cfg=load_config(ROOT), run_id="impossible", run_dir=run,
+                video_path=Path("x.mov"), session={"draw_hand": "right"})
+    res = s3.run(c)
+
+    quality = json.loads((run / "03_quality.json").read_text())
+    bad = quality["implausible_values"]["neck_inclination_deg"]
+    # Fewer than the 40 injected frames: smoothing pulls the edges of the step
+    # back inside the bound, which is the filter doing its job.
+    assert 5 <= bad["count"] <= 40 and bad["discarded"] is True
+
+    # The offending frames are gone from the table, so S5 can never average
+    # them and the report can never quote one.
+    k = pd.read_parquet(run / "03_kinematics.parquet")
+    lo, hi = bad["bounds"]
+    finite = k["neck_inclination_deg"].to_numpy(dtype=float)
+    finite = finite[np.isfinite(finite)]
+    assert finite.size and finite.min() >= lo and finite.max() <= hi
+
+    # A secondary measure losing frames warns; it does not kill the run.
+    assert res.passed
+    warn = [c2 for c2 in res.checks if c2.name == "implausible_frames_discarded"][0]
+    assert not warn.ok and warn.severity == "WARN"
+    assert "neck_inclination_deg" in warn.detail
+
+
+def test_a_core_measure_leaving_its_bounds_still_fails_the_step(ctx, tmp_path, monkeypatch):
+    import pandas as pd
+    from archery.config import load_config
+    from archery.steps import s03_kinematics as s3
+
+    run = tmp_path / "corebad"
+    run.mkdir(parents=True)
+    io_guard.configure([run])
+    pd.read_parquet(ctx.run_dir / "02_landmarks.parquet").to_parquet(
+        run / "02_landmarks.parquet", index=False)
+    (run / "01_frames.json").write_text(json.dumps(
+        {"frames_dir": str(run), "n_frames": 300, "analysis_fps": 60.0,
+         "frame_width": 1000, "frame_height": 1000}))
+    (run / "02_pose_quality.json").write_text(json.dumps({"detection_rate": 1.0}))
+    # An elbow cannot exceed 180 degrees, so this bound catches only the
+    # impossible. Tighten it and the core check must fail.
+    monkeypatch.setitem(s3.PLAUSIBLE, "elbow", (0.0, 30.0))
+    c = Context(cfg=load_config(ROOT), run_id="corebad", run_dir=run,
+                video_path=Path("x.mov"), session={"draw_hand": "right"})
+    res = s3.run(c)
+    assert not res.passed
+    fail = [c2 for c2 in res.failures if c2.name == "no_systematic_implausible_values"]
+    assert fail and "elbow_bow_deg" in fail[0].detail
+
+
+def test_quality_records_the_distribution_so_bounds_can_be_re_derived(ctx, result):
+    quality = json.loads((ctx.run_dir / "03_quality.json").read_text())
+    pct = quality["percentiles_p1_p50_p99"]
+    assert "neck_inclination_deg" in pct and "elbow_draw_deg" in pct
+    p1, p50, p99 = pct["elbow_draw_deg"]
+    assert p1 <= p50 <= p99

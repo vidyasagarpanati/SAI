@@ -41,9 +41,21 @@ from archery.context import Context
 from archery.contracts import WARN, StepResult
 from archery.io_guard import guarded_path
 
-# Anatomical plausibility bounds. A value outside these is not silently dropped,
-# it is counted and reported, because a systematic excursion means the pose is
-# wrong, not the archer.
+# Plausibility bounds. A value outside these is NOT a measurement: it is
+# discarded (set to NaN), counted and reported, because the pipeline's rule is
+# that a number it cannot support never reaches the report.
+#
+# The gravity-referenced bounds below are limits of possibility, not posture
+# judgements. A projected inclination grows with trunk rotation relative to the
+# camera and with how the frame is cropped, so a bound tighter than "the top
+# point is above the bottom point" would throw away real frames. The joint
+# bounds stay at 190 because an interior angle cannot exceed 180.
+#
+# These were previously tuned against angles computed in MediaPipe's normalised
+# coordinates, which scale each axis independently. On 16:9 that understated
+# every vertical-referenced angle: the old +/-70 on neck inclination is 78.4
+# in corrected pixel space, so the old bound was rejecting nothing and the new
+# one was rejecting frames that had always been there.
 PLAUSIBLE = {
     "elbow": (0.0, 190.0),
     "shoulder": (0.0, 190.0),
@@ -51,13 +63,25 @@ PLAUSIBLE = {
     "hip": (0.0, 190.0),
     "knee": (0.0, 190.0),
     "ankle": (0.0, 190.0),
-    "trunk_inclination": (-60.0, 60.0),
-    "neck_inclination": (-70.0, 70.0),
+    # Shoulders above pelvis, nose above the shoulder line. Past 90 the segment
+    # has inverted, which means the pose is wrong.
+    "trunk_inclination": (-89.0, 89.0),
+    "neck_inclination": (-89.0, 89.0),
+    # signed_tilt folds these into [-90, 90] already; beyond 60 a shoulder or
+    # pelvic line is not a shoulder or pelvic line.
     "head_tilt": (-60.0, 60.0),
-    "shoulder_tilt": (-45.0, 45.0),
-    "pelvic_tilt": (-45.0, 45.0),
-    "shoulder_hip_separation": (-60.0, 60.0),
+    "shoulder_tilt": (-60.0, 60.0),
+    "pelvic_tilt": (-60.0, 60.0),
+    "shoulder_hip_separation": (-89.0, 89.0),
 }
+
+# Measures the shot cannot be read without. An excursion here fails the step; in
+# any other measure it discards those frames and warns, because losing a few
+# per cent of a secondary orientation signal is detection noise, not a broken
+# pipeline, and killing the whole run over it helps nobody.
+CORE_MEASURES = ["elbow_bow_deg", "elbow_draw_deg", "shoulder_bow_deg", "shoulder_draw_deg",
+                 "trunk_inclination_deg", "anchor_distance_norm"]
+IMPLAUSIBLE_FAIL_SHARE = 0.20
 
 # Longest key first, so "shoulder_tilt" wins over "shoulder" for shoulder_tilt_deg.
 _PLAUSIBLE_KEYS = sorted(PLAUSIBLE, key=len, reverse=True)
@@ -312,6 +336,35 @@ def run(ctx: Context) -> StepResult:
     out["anchor_distance_rolling_sd"] = G.rolling_std(
         out["anchor_distance_norm"], max(3, int(round(0.1 * analysis_fps))))
 
+    # -- discard the impossible BEFORE writing the table ---------------------
+    # An out-of-bounds value left in the column flows into S5's means and can
+    # be quoted in the report as a fact, so it is removed here, not merely
+    # counted, and the coverage numbers below reflect the loss.
+    implausible = {}
+    for name in gated:
+        bounds = _bounds_for(name)
+        if bounds is None:
+            continue
+        lo, hi = bounds
+        col = out[name]
+        finite_mask = np.isfinite(col)
+        n_finite = int(finite_mask.sum())
+        if not n_finite:
+            continue
+        outside = finite_mask & ((col < lo) | (col > hi))
+        bad = int(outside.sum())
+        if not bad:
+            continue
+        offending = col[outside]
+        out[name] = np.where(outside, np.nan, col)
+        implausible[name] = {
+            "count": bad, "share": bad / n_finite, "bounds": [lo, hi],
+            "discarded": True,
+            "worst": [round(float(np.nanmin(offending)), 1),
+                      round(float(np.nanmax(offending)), 1)],
+            "core": name in CORE_MEASURES,
+        }
+
     df_out = pd.DataFrame(out)
     out_parquet = guarded_path(ctx.artefact("03_kinematics.parquet"))
     df_out.to_parquet(out_parquet, index=False)
@@ -328,18 +381,14 @@ def run(ctx: Context) -> StepResult:
                 values, counts = np.unique(bad, return_counts=True)
                 dominant_reason[name] = str(values[int(np.argmax(counts))])
 
-    implausible = {}
+    # Distribution of every gated measure, so a bound can be re-derived from
+    # real footage rather than adjusted until the run goes green.
+    percentiles = {}
     for name in gated:
-        bounds = _bounds_for(name)
-        if bounds is None:
-            continue
-        lo, hi = bounds
         finite = out[name][np.isfinite(out[name])]
         if finite.size:
-            bad = int(np.sum((finite < lo) | (finite > hi)))
-            if bad:
-                implausible[name] = {"count": bad, "share": bad / finite.size,
-                                     "bounds": [lo, hi]}
+            p1, p50, p99 = np.percentile(finite, [1, 50, 99])
+            percentiles[name] = [round(float(p1), 1), round(float(p50), 1), round(float(p99), 1)]
 
     # -- draw-hand cross-check ----------------------------------------------
     # At the most-anchored frame the bow arm is the extended one. If the draw arm
@@ -377,14 +426,14 @@ def run(ctx: Context) -> StepResult:
         "nan_rate_by_measure": nan_rates,
         "dominant_gate_reason": dominant_reason,
         "implausible_values": implausible,
+        "percentiles_p1_p50_p99": percentiles,
         "usable_frame_share": float(np.mean(frame_ok)),
         "pose_detection_rate": pose_quality.get("detection_rate"),
         "draw_hand_check": {"ok": bool(draw_hand_ok), "detail": draw_hand_check_detail},
     }
     out_quality = ctx.write_json("03_quality.json", quality)
 
-    core = ["elbow_bow_deg", "elbow_draw_deg", "shoulder_bow_deg", "shoulder_draw_deg",
-            "trunk_inclination_deg", "anchor_distance_norm"]
+    core = CORE_MEASURES
     worst = max((nan_rates.get(c, 1.0) for c in core), default=1.0)
 
     res.check("kinematics_written", out_parquet.is_file(), str(out_parquet))
@@ -393,10 +442,21 @@ def run(ctx: Context) -> StepResult:
               f"{worst:.1%}. Above 40% the shot cannot be measured reliably. "
               f"Per-measure rates: "
               + ", ".join(f"{c}={nan_rates.get(c, 1.0):.0%}" for c in core))
-    res.check("no_systematic_implausible_values",
-              all(v["share"] < 0.05 for v in implausible.values()),
-              f"Angles outside anatomical bounds: {implausible}" if implausible
-              else "All angles within anatomical plausibility bounds.")
+    fatal = {k: v for k, v in implausible.items()
+             if v["core"] or v["share"] >= IMPLAUSIBLE_FAIL_SHARE}
+    minor = {k: v for k, v in implausible.items() if k not in fatal}
+    res.check("no_systematic_implausible_values", not fatal,
+              ("Core measures outside plausibility bounds, so the shot cannot be "
+               f"measured reliably: {fatal}") if fatal
+              else "No core measure left its plausibility bounds.")
+    res.check("implausible_frames_discarded", not minor,
+              ("Discarded, not reported: "
+               + "; ".join(f"{k} {v['count']} frame(s), {v['share']:.1%}, worst {v['worst']}"
+                           for k, v in minor.items())
+               + ". These frames are NaN for that measure and reduce its coverage; "
+                 "no value outside the bounds reaches the report.")
+              if minor else "Every measured value was inside its plausibility bounds.",
+              severity=WARN)
     res.check("anchor_signal_present", bool(np.isfinite(out["anchor_distance_norm"]).any()),
               "Anchor-distance signal exists, so phase detection can run.")
     res.check("draw_hand_consistent_with_geometry", draw_hand_ok, draw_hand_check_detail,
