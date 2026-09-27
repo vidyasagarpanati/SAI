@@ -2,6 +2,8 @@
   "athlete_name": "Kalpana",
   "age": 19,
   "gender": "Female",
+  "height_cm": null,
+  "weight_kg": null,
   "bow_type": "Recurve",
   "discipline": "Olympic Recurve",
   "draw_hand": "right",
@@ -12,9 +14,18 @@
   "number_of_shots_expected": null,
   "additional_data": [],
   "notes": "",
+  "inputs_raw": null,
+  "inputs_unparsed": [],
   "manual_phase_overrides": null,
   "physio": {
-    "heart_rate_file": null,
-    "force_plate_file": null
+    "heart_rate": {
+      "rest_bpm": null,
+      "mean_bpm": null,
+      "max_bpm": null
+    },
+    "force_plate": {
+      "file": null,
+      "images": []
+    }
   }
 }

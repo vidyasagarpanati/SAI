@@ -2,40 +2,225 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Archery session metadata",
   "type": "object",
-  "required": ["athlete_name", "bow_type", "draw_hand", "camera_view"],
+  "required": [
+    "athlete_name",
+    "bow_type",
+    "draw_hand",
+    "camera_view"
+  ],
   "additionalProperties": false,
   "properties": {
-    "athlete_name": {"type": "string", "minLength": 1},
-    "age": {"type": ["integer", "null"], "minimum": 5, "maximum": 100},
-    "gender": {"type": ["string", "null"], "enum": ["Male", "Female", "Other", null]},
-    "bow_type": {"type": "string", "enum": ["Recurve", "Compound", "Barebow", "Traditional"]},
-    "discipline": {"type": ["string", "null"]},
+    "athlete_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "age": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 5,
+      "maximum": 100
+    },
+    "gender": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "Male",
+        "Female",
+        "Other",
+        null
+      ]
+    },
+    "bow_type": {
+      "type": "string",
+      "enum": [
+        "Recurve",
+        "Compound",
+        "Barebow",
+        "Traditional"
+      ]
+    },
+    "discipline": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "draw_hand": {
       "type": "string",
-      "enum": ["right", "left"],
+      "enum": [
+        "right",
+        "left"
+      ],
       "description": "Hand that draws the string. right = right-draw archer, bow held in the left hand."
     },
-    "camera_view": {"type": "string", "minLength": 1},
-    "camera_distance_m": {"type": ["number", "null"], "exclusiveMinimum": 0},
-    "session_date": {"type": ["string", "null"], "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},
+    "camera_view": {
+      "type": "string",
+      "minLength": 1
+    },
+    "camera_distance_m": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "exclusiveMinimum": 0
+    },
+    "session_date": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+    },
     "declared_frame_rate": {
-      "type": ["number", "null"],
+      "type": [
+        "number",
+        "null"
+      ],
       "description": "What the operator believes the capture rate was. The report always uses the MEASURED rate from S0 and flags any disagreement."
     },
-    "number_of_shots_expected": {"type": ["integer", "null"], "minimum": 1},
-    "additional_data": {"type": "array", "items": {"type": "string"}},
-    "notes": {"type": ["string", "null"]},
+    "number_of_shots_expected": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1
+    },
+    "additional_data": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "notes": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "manual_phase_overrides": {
-      "type": ["object", "null"],
+      "type": [
+        "object",
+        "null"
+      ],
       "description": "Optional escape hatch. Maps shot index to explicit phase boundaries in seconds. Overrides S4 rules and is recorded as such in the report."
     },
     "physio": {
-      "type": ["object", "null"],
+      "type": [
+        "object",
+        "null"
+      ],
       "additionalProperties": false,
       "properties": {
-        "heart_rate_file": {"type": ["string", "null"]},
-        "force_plate_file": {"type": ["string", "null"]}
+        "heart_rate": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "rest_bpm": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 25,
+              "maximum": 230,
+              "description": "Resting heart rate."
+            },
+            "mean_bpm": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 25,
+              "maximum": 230,
+              "description": "Average heart rate across the session."
+            },
+            "max_bpm": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 25,
+              "maximum": 230,
+              "description": "Highest observed heart rate. Measured, not the age-predicted estimate."
+            }
+          }
+        },
+        "force_plate": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "file": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Posturography export, .csv or .xlsx, read only and never modified."
+            },
+            "images": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Plate report images. Shown as figures; no number is ever read out of one."
+            }
+          }
+        },
+        "heart_rate_file": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Deprecated, unused."
+        },
+        "force_plate_file": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Deprecated, use physio.force_plate.file."
+        }
       }
+    },
+    "height_cm": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 100,
+      "maximum": 250,
+      "description": "Operator-entered standing height in centimetres."
+    },
+    "weight_kg": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 20,
+      "maximum": 200,
+      "description": "Operator-entered body mass in kilograms."
+    },
+    "inputs_raw": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "The free-text input block exactly as typed, kept for provenance."
+    },
+    "inputs_unparsed": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Lines of the free-text block that no field matched. Recorded as notes, never used as evidence."
     }
   }
 }

@@ -1,7 +1,9 @@
 """Command line interface.
 
     archery doctor
-    archery init-session --video "D:\\archery\\kalpana_01.mp4"
+    archery init-session --video "D:\\archery\\kalpana_01.mp4" --ask
+    archery init-session --video ... --profile "Height: 170 cms; Age: 16 years"
+    archery run --video ... --force-plate "D:\\archery\\Body Sway.xlsx"
     archery run --video "D:\\archery\\kalpana_01.mp4"
     archery run --video ... --to S5            # stop after the evidence file
     archery run --video ... --only S6          # rerun one step
@@ -57,6 +59,151 @@ def _make_run_id(cfg, video: Path, digest: str) -> str:
     return f"{video.stem}__{digest[:8]}"
 
 
+# ------------------------------------------------------------------ input block
+NOT_PROVIDED = "NOT PROVIDED"
+
+_ASK_ORDER = [
+    ("Name", "name"), ("Height", "height"), ("Weight", "weight"), ("Age", "age"),
+    ("Resting HR", "resting hr"), ("Average HR", "average hr"), ("Max HR", "max hr"),
+]
+
+
+def add_input_args(sp, ask: bool) -> None:
+    """The same input flags on init-session and on run. They only fill
+    session.json; the file stays the single source of truth, because the resume
+    cache keys on session fields and an input the cache cannot see would let a
+    changed profile reuse a stale report."""
+    g = sp.add_argument_group("athlete and physiological inputs")
+    g.add_argument("--profile", metavar="TEXT",
+                   help="Free-text block. Use ';' between fields, e.g. "
+                        "\"Height: 170 cms; Weight: 60 Kgs; Age: 16 years; Resting HR: 60 bpm\"")
+    g.add_argument("--profile-file", metavar="PATH",
+                   help="The same block read from a file, one field per line. "
+                        "Easier than quoting multi-line text in PowerShell.")
+    g.add_argument("--force-plate", metavar="PATH",
+                   help="Posturography export, .csv or .xlsx. Opened read only.")
+    g.add_argument("--force-plate-image", metavar="PATH", action="append", default=[],
+                   help="Plate report image, repeatable. Shown as a figure; "
+                        "no number is ever read out of an image.")
+    g.add_argument("--yes", "-y", action="store_true",
+                   help="Skip the confirmation prompt. Use for unattended runs.")
+    if ask:
+        g.add_argument("--ask", action="store_true",
+                       help="Prompt for each field instead of passing --profile.")
+
+
+def _prompt_block() -> str:
+    print("Enter the athlete inputs. Press Enter to leave a field out.\n")
+    lines = []
+    for label, _ in _ASK_ORDER:
+        try:
+            value = input(f"  {label}: ").strip()
+        except EOFError:
+            break
+        if value:
+            lines.append(f"{label}: {value}")
+    return "\n".join(lines)
+
+
+def _check_readable(path_str: str, what: str) -> Path:
+    path = Path(path_str).expanduser()
+    if not path.is_file():
+        raise SystemExit(f"{what} not found: {path}")
+    try:
+        with open(path, "rb") as fh:
+            fh.read(1)
+    except OSError as exc:
+        raise SystemExit(f"{what} cannot be read: {path}\n  {exc}")
+    return path.resolve()
+
+
+def apply_input_args(session: dict, args) -> dict:
+    """Fold the input flags into a copy of the session dict."""
+    from archery.profile_text import ProfileError, apply_to_session, parse
+
+    text = ""
+    if getattr(args, "ask", False):
+        text = _prompt_block()
+    if getattr(args, "profile_file", None):
+        text = _check_readable(args.profile_file, "Profile file").read_text(encoding="utf-8")
+    if getattr(args, "profile", None):
+        text = (text + "\n" + args.profile) if text else args.profile
+
+    out = dict(session)
+    if text.strip():
+        try:
+            out = apply_to_session(out, parse(text))
+        except ProfileError as exc:
+            raise SystemExit(str(exc))
+
+    if getattr(args, "athlete", None):
+        out["athlete_name"] = args.athlete
+
+    if getattr(args, "force_plate", None) or getattr(args, "force_plate_image", None):
+        physio = dict(out.get("physio") or {})
+        plate = dict(physio.get("force_plate") or {})
+        if getattr(args, "force_plate", None):
+            plate["file"] = str(_check_readable(args.force_plate, "Force-plate export"))
+        if getattr(args, "force_plate_image", None):
+            plate["images"] = [str(_check_readable(i, "Force-plate image"))
+                               for i in args.force_plate_image]
+        physio["force_plate"] = plate
+        out["physio"] = physio
+    return out
+
+
+def _dig(session: dict, path: str):
+    node = session
+    for key in path.split("."):
+        if not isinstance(node, dict):
+            return None
+        node = node.get(key)
+    return node
+
+
+_INVENTORY = [
+    ("athlete_name", "athlete_name", ""),
+    ("height_cm", "height_cm", "cm"),
+    ("weight_kg", "weight_kg", "kg"),
+    ("age_y", "age", "years"),
+    ("hr_rest_bpm", "physio.heart_rate.rest_bpm", "bpm"),
+    ("hr_mean_bpm", "physio.heart_rate.mean_bpm", "bpm"),
+    ("hr_max_bpm", "physio.heart_rate.max_bpm", "bpm"),
+]
+
+
+def print_inputs(session: dict) -> None:
+    """Say back exactly what was understood, and name what was not. A silent
+    default is how a wrong number reaches a report."""
+    print("INPUTS UNDERSTOOD")
+    for label, path, unit in _INVENTORY:
+        value = _dig(session, path)
+        shown = NOT_PROVIDED if value in (None, "", []) else (
+            f"{value:g} {unit}".strip() if isinstance(value, (int, float)) else str(value))
+        print(f"  {label:<14} {shown}")
+
+    plate = _dig(session, "physio.force_plate.file")
+    print(f"  {'force_plate':<14} {Path(plate).name if plate else NOT_PROVIDED}")
+    images = _dig(session, "physio.force_plate.images") or []
+    print(f"  {'plate_images':<14} "
+          f"{', '.join(Path(i).name for i in images) if images else NOT_PROVIDED}")
+
+    unparsed = session.get("inputs_unparsed") or []
+    if unparsed:
+        print("UNPARSED, kept as notes and never used as evidence")
+        for line in unparsed:
+            print(f'  "{line}"')
+
+
+def confirm(args) -> bool:
+    if getattr(args, "yes", False) or not sys.stdin.isatty():
+        return True
+    try:
+        return input("Proceed? [y/N] ").strip().lower() in {"y", "yes"}
+    except EOFError:
+        return False
+
+
 def cmd_init_session(args) -> int:
     cfg = _bootstrap(args.root)
     video = Path(args.video)
@@ -66,9 +213,18 @@ def cmd_init_session(args) -> int:
         return 1
     template = json.loads((cfg.root / "session.example.json").read_text(encoding="utf-8"))
     template["athlete_name"] = args.athlete or video.stem
+    template = apply_input_args(template, args)
+
+    print_inputs(template)
+    if not confirm(args):
+        print("Nothing written.")
+        return 1
+
     with io_guard.guarded_open(target, "w", encoding="utf-8") as fh:
         json.dump(template, fh, indent=2)
-    print(f"Wrote {target}\nEdit it, then run:  archery run --video \"{video}\"")
+    print(f"\nWrote {target}")
+    print(f"Check bow_type, draw_hand and camera_view, then run:  "
+          f"archery run --video \"{video}\"")
     return 0
 
 
@@ -223,7 +379,21 @@ def cmd_run(args) -> int:
     if not video.is_file():
         raise SystemExit(f"Video not found: {video}")
 
-    session = _load_session(_session_path(cfg, video, args.session))
+    session_path = _session_path(cfg, video, args.session)
+    session = _load_session(session_path)
+    updated = apply_input_args(session, args)
+    if updated != session:
+        # Persist before running so the cache key and the report's provenance
+        # both see exactly what was supplied on the command line.
+        print_inputs(updated)
+        if not confirm(args):
+            print("Nothing written, nothing run.")
+            return 1
+        with io_guard.guarded_open(session_path, "w", encoding="utf-8") as fh:
+            json.dump(updated, fh, indent=2)
+        print(f"Updated {session_path}\n")
+        session = updated
+
     digest = sha256_file(video)
     run_id = args.run_id or _make_run_id(cfg, video, digest)
     run_dir = cfg.paths.runs_dir / run_id
@@ -333,6 +503,7 @@ def build_parser() -> argparse.ArgumentParser:
     i.add_argument("--session")
     i.add_argument("--athlete")
     i.add_argument("--force", action="store_true")
+    add_input_args(i, ask=True)
     i.set_defaults(func=cmd_init_session)
 
     r = sub.add_parser("run", help="Run the pipeline.")
@@ -344,6 +515,8 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--only", choices=STEP_ORDER, help="Run exactly one step.")
     r.add_argument("--force", action="store_true", help="Ignore the resume cache.")
     r.add_argument("--no-graph", action="store_true", help="Run steps directly, bypassing LangGraph.")
+    r.add_argument("--athlete", help="Override the athlete name in the session file.")
+    add_input_args(r, ask=False)
     r.set_defaults(func=cmd_run)
 
     s = sub.add_parser("status", help="Show the state of a run.")
