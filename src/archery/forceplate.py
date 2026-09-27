@@ -123,7 +123,11 @@ def _rows_xlsx(path: Path) -> list[dict]:
         from openpyxl import load_workbook
     except ImportError as exc:  # pragma: no cover - environment problem, not logic
         raise ForcePlateError(
-            f"Reading {path.name} needs openpyxl.  pip install openpyxl==3.1.5"
+            f"Reading {path.name} needs openpyxl, which is not installed in this "
+            f"environment.\n"
+            f"  Fix:  pip install openpyxl==3.1.5\n"
+            f"  Or export the trials as .csv, which needs no extra package.\n"
+            f"  Nothing else has to re-run: SP is the only step that reads this file."
         ) from exc
     book = load_workbook(path, read_only=True, data_only=True)
     sheet = book[book.sheetnames[0]]

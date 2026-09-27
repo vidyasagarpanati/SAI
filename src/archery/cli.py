@@ -237,7 +237,7 @@ def cmd_doctor(args) -> int:
                  f"{sys.version.split()[0]} (need 3.11 or 3.12 for mediapipe wheels)"))
 
     for mod in ["cv2", "numpy", "pandas", "pyarrow", "yaml",
-                "jsonschema", "jinja2", "httpx", "langgraph"]:
+                "jsonschema", "jinja2", "httpx", "langgraph", "openpyxl"]:
         try:
             __import__(mod)
             rows.append((mod, True, "installed"))
