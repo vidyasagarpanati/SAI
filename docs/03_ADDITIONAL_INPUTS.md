@@ -394,8 +394,38 @@ body-composition language anywhere in the HTML.
 Not built, by decision: the `time,bpm` heart-rate CSV reader (D1, free text
 first) and any reading of numbers out of a plate image (D5).
 
+## Part 6 - Feature 1, what shipped
+
+Triggered by a real frame: draw elbow reported 109.9 deg on a folded draw arm.
+
+Changed from the spec in Part 1 in one respect. The plan was to add `_2d` keys
+beside the existing world-space keys. Instead the plain key IS the image-plane
+angle and the world value moved to `<name>_3d`. The reason is that the plain
+keys are what the overlay, the evidence file, the section prompts and the
+report tables all reference; adding a parallel set would have left the wrong
+number as the default everywhere it already appears. The gap key kept its
+spec name, `<name>_2d3d_diff`.
+
+| Change | Why |
+|---|---|
+| Joint angles measured in the image plane, in pixels | The only value that can be checked against the frame. World depth is inferred from one camera and fails worst at full draw. |
+| `<name>_3d` and `<name>_2d3d_diff` added | The world value stays available as a cross-check rather than disappearing. |
+| `quality_gates.angle_2d3d_disagree_deg: 15` | Above the gap the joint is not square to the camera: S5 marks it FORESHORTENED at LOW, the overlay appends `!`. |
+| Image-plane work moved from normalised coordinates to pixels | Second bug, found while fixing the first. Normalised axes scale independently, so on 16:9 x was stretched 1.78x and the shipped trunk, pelvic, shoulder and head tilts were all wrong. |
+| S1 records `frame_width` / `frame_height`; S3 refuses to run without them | A defaulted aspect ratio is how a wrong number reaches a report silently. |
+| `shoulder_<side>_girdle_deg` added | Arm against the shoulder-girdle line, the angle a coach reads at full draw, alongside the existing arm-against-trunk definition. |
+| Pose model switched to `pose_landmarker_heavy.task` | Its weakest endpoints under occlusion are the bow hand and string hand, which is where the wrist and elbow angles are read. |
+| Report gains an angle-space table | A foreshortened joint is visible, not merely downgraded. |
+
+Deliberately not changed: distances and speeds stay in normalised units,
+because the phase thresholds in `phase_rules.yaml` are tuned against them and
+re-tuning is a separate, separately-testable job. One consequence to watch:
+`draw_elbow_rate_deg_s` now derives from the image-plane angle, so
+`min_elbow_rate_deg_per_s` operates on a different, better-behaved series.
+
 ## Change log
 
+- 2026-09-27 Feature 1 implemented after a real frame reproduced the defect.
 - 2026-09-27 Feature 2 implemented end to end. Step SP added between S0 and S1.
   Feature 1 not started.
 - 2026-09-26 Prompt enhanced (Part 0). Force-plate sample analysed. Spec written.
