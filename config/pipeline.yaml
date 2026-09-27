@@ -7,7 +7,10 @@ paths:
   runs_dir: runs
   outputs_dir: outputs
   models_dir: models
-  pose_model_file: pose_landmarker_full.task   # MediaPipe "full" == model_complexity 1
+  pose_model_file: pose_landmarker_heavy.task   # heavy, not full: the weakest
+  #   endpoint under occlusion is the bow hand and the string hand, which is
+  #   exactly where the wrist and elbow angles are read. Costs roughly 2-3x
+  #   the CPU time of full in S2 and nothing anywhere else.
 
 frames:
   analysis_fps: 60          # decode target. Uses min(native_fps, analysis_fps).
@@ -26,6 +29,8 @@ quality_gates:
   landmark_low_confidence_flag: 0.3   # below this -> DETECTED - LOW CONFIDENCE
   angle_min_confidence: 0.4           # both proximal and distal must reach this
   min_visible_landmarks: 20           # of 33, else INSUFFICIENT_LANDMARKS
+  angle_2d3d_disagree_deg: 15   # image-plane vs world angle gap above which a
+                                # joint is called FORESHORTENED and dropped to LOW
 
 smoothing:
   enabled: true

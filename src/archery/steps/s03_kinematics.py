@@ -9,14 +9,26 @@ VERIFY every angle gated on landmark confidence, NaN rate reported per angle,
        against the observed geometry
 
 Coordinate policy, stated once and applied everywhere:
-  - True joint angles (elbow, shoulder, hip, knee, ankle, wrist) are computed in
-    MediaPipe WORLD space, metres, because image space distorts them with
-    perspective.
-  - Orientation measures against gravity or the image frame (trunk inclination,
-    pelvic tilt, shoulder tilt, head tilt) are computed in IMAGE space, because
-    that is where the camera's vertical actually lives.
+  - True joint angles (elbow, shoulder, hip, knee, ankle, wrist) are measured
+    TWICE. The plain key is the IMAGE-PLANE angle in pixels: what the joint
+    subtends in the frame a coach is looking at, and the only value anyone can
+    check against the picture. The <name>_3d key is the same angle in
+    MediaPipe WORLD space, whose depth is inferred from a single view.
+    <name>_2d3d_diff is the gap; a large gap means the joint is not square to
+    the camera and S5 marks the measure FORESHORTENED at LOW confidence.
+    World space was the primary until a real frame showed the draw elbow at
+    110 degrees where the picture plainly showed about 20: at full draw the
+    draw upper arm points partly along the camera axis, the worst case for
+    inferred depth.
+  - Image-plane work is done in PIXELS, never in the normalised [0, 1]
+    coordinates MediaPipe returns. Those normalise each axis independently, so
+    on 16:9 the x axis is stretched 1.78x against y and every angle taken in
+    that space is wrong. This applies to the orientation measures against
+    gravity or the frame (trunk inclination, pelvic tilt, shoulder tilt, head
+    tilt) as much as to the joint angles.
   - Distances used as signals are normalised by shoulder width so they are
-    independent of camera distance and subject size.
+    independent of camera distance and subject size. They stay in normalised
+    coordinates because the phase thresholds are tuned against them.
 """
 from __future__ import annotations
 
@@ -95,6 +107,21 @@ def run(ctx: Context) -> StepResult:
     img, world, vis, t_ms = _load_arrays(ctx)
     n = img.shape[0]
 
+    # Image-plane geometry is measured in PIXELS. MediaPipe normalises x and y
+    # to [0, 1] on each axis independently, so on 16:9 the x axis is stretched
+    # 1.78x against y and every angle taken in that space is wrong. Distances
+    # and speeds stay in normalised units: they are divided by a shoulder width
+    # measured the same way, and the phase thresholds are tuned against them.
+    w_px = frames_meta.get("frame_width")
+    h_px = frames_meta.get("frame_height")
+    if not w_px or not h_px:
+        raise RuntimeError(
+            "01_frames.json carries no frame_width/frame_height. Image-plane "
+            "angles cannot be computed without the aspect ratio, and defaulting "
+            "it would silently skew every angle. Re-run S1 with --force.")
+    imgpx = img * np.array([float(w_px), float(h_px)])
+
+
     min_conf = float(ctx.cfg.get("quality_gates.angle_min_confidence", 0.4))
     min_visible = int(ctx.cfg.get("quality_gates.min_visible_landmarks", 20))
     track_conf = float(ctx.cfg.get("quality_gates.landmark_track_confidence", 0.5))
@@ -115,60 +142,92 @@ def run(ctx: Context) -> StepResult:
     }
     reasons: dict[str, np.ndarray] = {}
     gated: list[str] = []
+    joints: list[str] = []
 
-    def add_angle(name: str, vertex: int, p1: int, p2: int, space: str = "world") -> None:
+    def add_angle(name: str, vertex: int, p1: int, p2: int, space: str = "image") -> None:
         ids = [vertex, p1, p2]
         usable, reason = _gate(vis, ids, min_conf, frame_ok)
-        src = world if space == "world" else img
+        src = world if space == "world" else imgpx
         values = G.angle_at(src[:, vertex], src[:, p1], src[:, p2])
         values = np.where(usable, values, np.nan)
         out[name] = values
         reasons[name] = reason
         gated.append(name)
 
-    # -- true joint angles, world space -------------------------------------
+    def add_joint(name: str, vertex: int, p1: int, p2: int) -> None:
+        """One joint, measured twice.
+
+        The plain key is the IMAGE-PLANE angle: what the joint subtends in the
+        pixels a coach is looking at. It is the primary because it is the only
+        one anybody can check against the frame.
+
+        The _3d key is the same angle in MediaPipe's world landmarks, whose
+        depth is inferred from a single view. At full draw the draw upper arm
+        points partly along the camera axis, which is the worst case for
+        inferred depth, and the 3D draw-elbow angle came back around 110
+        degrees where the frame plainly shows roughly 20. It is kept as a
+        cross-check, never as the headline.
+
+        _2d3d_diff is how far apart they are. A large gap means the joint is
+        not square to the camera, so the image-plane angle is foreshortened and
+        S5 drops its confidence to LOW.
+        """
+        add_angle(name, vertex, p1, p2, space="image")
+        add_angle(f"{name}_3d", vertex, p1, p2, space="world")
+        joints.append(name)
+
+    # -- true joint angles ---------------------------------------------------
     for label, s in (("bow", bow), ("draw", draw)):
-        add_angle(f"elbow_{label}_deg", s["elbow"], s["shoulder"], s["wrist"])
-        add_angle(f"shoulder_{label}_deg", s["shoulder"], s["elbow"], s["hip"])
-        add_angle(f"wrist_{label}_deg", s["wrist"], s["elbow"], s["index"])
+        add_joint(f"elbow_{label}_deg", s["elbow"], s["shoulder"], s["wrist"])
+        add_joint(f"shoulder_{label}_deg", s["shoulder"], s["elbow"], s["hip"])
+        add_joint(f"wrist_{label}_deg", s["wrist"], s["elbow"], s["index"])
+    # Second shoulder definition: arm against the shoulder-girdle line rather
+    # than against the trunk. This is the angle a coach reads at full draw, and
+    # it answers a different question from shoulder_*_deg, so both are reported
+    # and the report labels which is which.
+    sh_ids = {"bow": L.side(L.bow_side(ctx.draw_hand))["shoulder"],
+              "draw": L.side(L.draw_side(ctx.draw_hand))["shoulder"]}
+    for label, s in (("bow", bow), ("draw", draw)):
+        other = sh_ids["draw" if label == "bow" else "bow"]
+        add_joint(f"shoulder_{label}_girdle_deg", s["shoulder"], s["elbow"], other)
     for label, prefix in (("left", "LEFT"), ("right", "RIGHT")):
         s = L.side(prefix)
-        add_angle(f"hip_{label}_deg", s["hip"], s["shoulder"], s["knee"])
-        add_angle(f"knee_{label}_deg", s["knee"], s["hip"], s["ankle"])
-        add_angle(f"ankle_{label}_deg", s["ankle"], s["knee"], s["foot"])
+        add_joint(f"hip_{label}_deg", s["hip"], s["shoulder"], s["knee"])
+        add_joint(f"knee_{label}_deg", s["knee"], s["hip"], s["ankle"])
+        add_joint(f"ankle_{label}_deg", s["ankle"], s["knee"], s["foot"])
 
-    # -- orientation measures, image space ----------------------------------
+    # -- orientation measures, image plane, in pixels ------------------------
     sh_l, sh_r = ID["LEFT_SHOULDER"], ID["RIGHT_SHOULDER"]
     hip_l, hip_r = ID["LEFT_HIP"], ID["RIGHT_HIP"]
     ear_l, ear_r = ID["LEFT_EAR"], ID["RIGHT_EAR"]
 
-    shoulder_mid = (img[:, sh_l] + img[:, sh_r]) / 2.0
-    pelvis_mid = (img[:, hip_l] + img[:, hip_r]) / 2.0
+    shoulder_mid = (imgpx[:, sh_l] + imgpx[:, sh_r]) / 2.0
+    pelvis_mid_px = (imgpx[:, hip_l] + imgpx[:, hip_r]) / 2.0
 
     u, r = _gate(vis, [sh_l, sh_r], min_conf, frame_ok)
-    out["shoulder_tilt_deg"] = np.where(u, G.signed_tilt(img[:, sh_l], img[:, sh_r]), np.nan)
+    out["shoulder_tilt_deg"] = np.where(u, G.signed_tilt(imgpx[:, sh_l], imgpx[:, sh_r]), np.nan)
     reasons["shoulder_tilt_deg"] = r
     gated.append("shoulder_tilt_deg")
 
     u, r = _gate(vis, [hip_l, hip_r], min_conf, frame_ok)
-    out["pelvic_tilt_deg"] = np.where(u, G.signed_tilt(img[:, hip_l], img[:, hip_r]), np.nan)
+    out["pelvic_tilt_deg"] = np.where(u, G.signed_tilt(imgpx[:, hip_l], imgpx[:, hip_r]), np.nan)
     reasons["pelvic_tilt_deg"] = r
     gated.append("pelvic_tilt_deg")
 
     u, r = _gate(vis, [ear_l, ear_r], min_conf, frame_ok)
-    out["head_tilt_deg"] = np.where(u, G.signed_tilt(img[:, ear_l], img[:, ear_r]), np.nan)
+    out["head_tilt_deg"] = np.where(u, G.signed_tilt(imgpx[:, ear_l], imgpx[:, ear_r]), np.nan)
     reasons["head_tilt_deg"] = r
     gated.append("head_tilt_deg")
 
     u, r = _gate(vis, [sh_l, sh_r, hip_l, hip_r], min_conf, frame_ok)
     out["trunk_inclination_deg"] = np.where(
-        u, G.line_angle_from_vertical(shoulder_mid, pelvis_mid), np.nan)
+        u, G.line_angle_from_vertical(shoulder_mid, pelvis_mid_px), np.nan)
     reasons["trunk_inclination_deg"] = r
     gated.append("trunk_inclination_deg")
 
     u, r = _gate(vis, [ID["NOSE"], sh_l, sh_r], min_conf, frame_ok)
     out["neck_inclination_deg"] = np.where(
-        u, G.line_angle_from_vertical(img[:, ID["NOSE"]], shoulder_mid), np.nan)
+        u, G.line_angle_from_vertical(imgpx[:, ID["NOSE"]], shoulder_mid), np.nan)
     reasons["neck_inclination_deg"] = r
     gated.append("neck_inclination_deg")
 
@@ -208,6 +267,7 @@ def run(ctx: Context) -> StepResult:
     out["draw_wrist_speed_norm_s"] = G.speed(smooth_xy(draw_wrist), dt) / sw_med
     out["bow_wrist_speed_norm_s"] = G.speed(smooth_xy(bow_wrist), dt) / sw_med
 
+    pelvis_mid = (img[:, hip_l] + img[:, hip_r]) / 2.0     # normalised, not pixels
     out["com_x_norm"] = pelvis_mid[:, 0]
     out["com_y_norm"] = pelvis_mid[:, 1]
     out["com_speed_norm_s"] = G.speed(smooth_xy(pelvis_mid), dt) / sw_med
@@ -238,6 +298,13 @@ def run(ctx: Context) -> StepResult:
                 continue
             out[name] = G.smooth_nan(out[name], window, polyorder)
             smoothed_cols.append(name)
+
+    # -- 2D vs 3D gap, after smoothing --------------------------------------
+    # Derived from the smoothed angles rather than smoothed itself: a
+    # Savitzky-Golay pass over a difference overshoots and produced negative
+    # gaps, which the plausibility check correctly flagged as impossible.
+    for name in joints:
+        out[f"{name}_2d3d_diff"] = np.abs(out[name] - out[f"{name}_3d"])
 
     # -- derivatives after smoothing ----------------------------------------
     out["anchor_distance_rate_s"] = G.rate_of_change(out["anchor_distance_norm"], dt)

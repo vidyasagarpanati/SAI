@@ -93,9 +93,20 @@ def run(ctx: Context) -> StepResult:
               f"configured analysis window and is truncated.",
               severity=WARN)
 
+    import cv2 as _cv2
+    _first = _cv2.imread(str(existing[0]))
+    if _first is None:
+        raise RuntimeError(f"Could not read the first extracted frame: {existing[0]}")
+    _h, _w = _first.shape[:2]
+
     payload = {
         "frames_dir": str(frames_dir),
         "n_frames": n,
+        # The decoded frame size. Landmarks are normalised against THIS, so any
+        # image-plane angle has to be un-normalised with it or the aspect ratio
+        # skews every angle (1.78x on 16:9).
+        "frame_width": int(_w),
+        "frame_height": int(_h),
         "analysis_fps": analysis_fps,
         "native_fps": native_fps,
         "frame_pattern": "f%06d.jpg",

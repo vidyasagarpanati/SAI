@@ -35,8 +35,12 @@ def make_run(run_dir: Path, df, fps: float, session: dict | None = None,
     io_guard.configure(roots)
     df.to_parquet(run_dir / "02_landmarks.parquet", index=False)
     n = int(df["frame"].max()) + 1
+    # A square declared frame: the synthetic archer is laid out in normalised
+    # coordinates, so declaring 1:1 makes pixel geometry equal that layout and
+    # the known angles stay known. Aspect handling is tested separately.
     (run_dir / "01_frames.json").write_text(json.dumps(
-        {"frames_dir": str(run_dir / "frames"), "n_frames": n, "analysis_fps": fps}))
+        {"frames_dir": str(run_dir / "frames"), "n_frames": n, "analysis_fps": fps,
+         "frame_width": 1000, "frame_height": 1000}))
     (run_dir / "02_pose_quality.json").write_text(json.dumps(
         {"detection_rate": 1.0, "per_frame_visible_count": [31] * n}))
     sess = {"draw_hand": "right", "athlete_name": "Synthetic", "bow_type": "Recurve",

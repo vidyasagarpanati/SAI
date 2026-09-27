@@ -48,6 +48,8 @@ NICE = {"elbow_bow_deg": "Bow elbow angle", "elbow_draw_deg": "Draw elbow angle"
         "wrist_bow_deg": "Bow wrist angle", "wrist_draw_deg": "Draw wrist angle",
         "trunk_inclination_deg": "Trunk inclination", "neck_inclination_deg": "Neck inclination",
         "head_tilt_deg": "Head tilt", "shoulder_tilt_deg": "Shoulder-girdle tilt",
+        "shoulder_bow_girdle_deg": "Bow shoulder to girdle line",
+        "shoulder_draw_girdle_deg": "Draw shoulder to girdle line",
         "pelvic_tilt_deg": "Pelvic tilt", "shoulder_hip_separation_deg": "Shoulder-hip separation",
         "hip_left_deg": "Hip angle (left)", "hip_right_deg": "Hip angle (right)",
         "knee_left_deg": "Knee angle (left)", "knee_right_deg": "Knee angle (right)",
@@ -194,6 +196,25 @@ def build_view(ctx: Context, version_label: str) -> tuple[dict, int, int]:
                            "xsd": _v(c.get("sd"), units[k]) if c.get("sd") is not None else (c.get("status") or "—"),
                            "conf": d.get("confidence")})
 
+    # Section 5: the two angle spaces, side by side. The report leads with the
+    # image-plane value because it is the only one a reader can check against
+    # the frame; the world value is shown so a foreshortened joint is visible
+    # rather than merely downgraded.
+    aim_measures = m["per_shot"][0]["phases"].get("AIM", {}).get("measures", {})
+    angle_space_rows = []
+    for k in [c for c in CORE if c.endswith("_deg")] + [
+            "shoulder_bow_girdle_deg", "shoulder_draw_girdle_deg"]:
+        d2, d3 = aim_measures.get(k), aim_measures.get(f"{k}_3d")
+        if not d2 or not d3:
+            continue
+        gap = aim_measures.get(f"{k}_2d3d_diff", {})
+        angle_space_rows.append({
+            "name": NICE.get(k, k.replace("_", " ")),
+            "two_d": _v(d2.get("mean"), "deg"), "three_d": _v(d3.get("mean"), "deg"),
+            "gap": _v(gap.get("mean"), "deg"),
+            "flag": d2.get("confidence_reason") or "",
+            "conf": d2.get("confidence")})
+
     timing_rows = []
     for code in ORDER:
         t = m["timing"].get(code)
@@ -313,6 +334,7 @@ def build_view(ctx: Context, version_label: str) -> tuple[dict, int, int]:
         "quality_rows": quality_rows, "overall_conf": q["overall_analysis_confidence"],
         "overall_rule": q["overall_confidence_rule"],
         "frame_rows": frame_rows, "phases": phases, "stats_rows": stats_rows,
+        "angle_space_rows": angle_space_rows,
         "timing_rows": timing_rows, "rankings": rankings, "bench_rows": bench_rows,
         "bench_rejected": bench_rejected, "framework": framework,
         "n_strengths": len(n.get("s13_strengths", {}).get("items", [])), "conf_counts": counts,

@@ -48,12 +48,23 @@ MEASURES: dict[str, tuple[str, int, bool]] = {
     "trunk_inclination_deg": ("deg", 1, False), "neck_inclination_deg": ("deg", 1, False),
     "head_tilt_deg": ("deg", 1, False), "shoulder_tilt_deg": ("deg", 1, False),
     "pelvic_tilt_deg": ("deg", 1, False), "shoulder_hip_separation_deg": ("deg", 1, False),
+    "shoulder_bow_girdle_deg": ("deg", 1, True), "shoulder_draw_girdle_deg": ("deg", 1, True),
     "anchor_distance_norm": ("shoulder widths", 3, True),
     "stance_width_norm": ("shoulder widths", 3, True),
     "bow_arm_elevation_norm": ("shoulder widths", 3, False),
     "draw_wrist_speed_norm_s": ("shoulder widths/s", 3, True),
     "com_speed_norm_s": ("shoulder widths/s", 3, True),
 }
+# Every joint angle above is also measured in MediaPipe's world landmarks and
+# carried as <name>_3d, with <name>_2d3d_diff between them. The plain key is the
+# image-plane angle and is the one the report leads with; the 3D value is a
+# cross-check whose depth is inferred from a single view.
+JOINTS = [m for m in MEASURES if m.endswith("_deg") and not m.endswith(
+    ("_tilt_deg", "_inclination_deg", "_separation_deg"))]
+for _m in JOINTS:
+    MEASURES[f"{_m}_3d"] = ("deg", 1, True)
+    MEASURES[f"{_m}_2d3d_diff"] = ("deg", 1, False)
+
 CORE_AIM = ["elbow_bow_deg", "elbow_draw_deg", "shoulder_bow_deg", "shoulder_draw_deg",
             "trunk_inclination_deg", "anchor_distance_norm"]
 
@@ -109,6 +120,7 @@ def run(ctx: Context) -> StepResult:
 
     shoulder_w = float(np.nanmedian(k["shoulder_width_norm"])) if "shoulder_width_norm" in k else np.nan
     measures = {m: spec for m, spec in MEASURES.items() if m in k.columns}
+    disagree_gate = float(ctx.cfg.get("quality_gates.angle_2d3d_disagree_deg", 15.0))
     evidence: dict[str, dict] = {}
 
     def ev(key: str, value, units: str, confidence: str | None = None, n: int | None = None):
@@ -190,6 +202,18 @@ def run(ctx: Context) -> StepResult:
                 d = describe(seg[m].to_numpy(dtype=float), dec, p["boundary_confidence"])
                 if kf is not None and np.isfinite(k.at[kf, m]):
                     d["at_key_frame"] = _r(k.at[kf, m], dec)
+                # When the image-plane and world angles disagree, the joint is
+                # not square to the camera, so the projected angle is
+                # foreshortened. Say so and drop to LOW rather than presenting
+                # a number the frame does not support.
+                diff_col = f"{m}_2d3d_diff"
+                if diff_col in seg.columns:
+                    gap = float(np.nanmedian(seg[diff_col].to_numpy(dtype=float))) \
+                        if np.any(np.isfinite(seg[diff_col].to_numpy(dtype=float))) else float("nan")
+                    if np.isfinite(gap) and gap > disagree_gate:
+                        d["confidence"] = "LOW"
+                        d["confidence_reason"] = "FORESHORTENED"
+                        d["deg_2d3d_gap"] = _r(gap, 1)
                 entry["measures"][m] = d
                 for stat in ("min", "max", "mean", "range", "sd", "at_key_frame"):
                     ev(f"{base}.{m}.{stat}", d.get(stat), units, d.get("confidence"), d.get("n_valid"))

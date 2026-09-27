@@ -302,8 +302,12 @@ def cmd_doctor(args) -> int:
                  shutil.which("ffprobe") or "not found (OpenCV fallback will be used)"))
 
     model = cfg.paths.models_dir / cfg.get("paths.pose_model_file")
+    stem = model.name.replace(".task", "").replace("pose_landmarker_", "")
     rows.append(("pose model", model.is_file(),
-                 str(model) if model.is_file() else f"missing: {model}"))
+                 str(model) if model.is_file() else
+                 f"missing: {model}\n"
+                 f"      download: https://storage.googleapis.com/mediapipe-models/"
+                 f"pose_landmarker/pose_landmarker_{stem}/float16/1/{model.name}"))
 
     base = cfg.get("llm.base_url")
     try:

@@ -157,3 +157,45 @@ def test_s5_bow_arm_straighter_than_draw_arm_at_full_draw(single):
     m = json.loads((ctx.run_dir / "05_metrics.json").read_text())
     aim = m["per_shot"][0]["phases"]["AIM"]["measures"]
     assert aim["elbow_bow_deg"]["mean"] > aim["elbow_draw_deg"]["mean"]
+
+
+def test_a_foreshortened_joint_is_flagged_and_dropped_to_low(tmp_path):
+    """A joint pointing along the camera axis reads differently in the image
+    plane and in world space. That gap is the signal that the projected angle
+    cannot be trusted, and it must reach the report as LOW, not as a number."""
+    import json
+
+    import numpy as np
+    import pandas as pd
+
+    from archery.landmarks import ID
+    from archery.steps import s03_kinematics, s04_phases, s05_stats
+    import synthetic
+    from helpers import make_run
+
+    df, truth = synthetic.build()
+    # Push the draw elbow far out in depth. The image plane cannot see this, so
+    # the two spaces must now disagree for that joint and no other.
+    n = int(df["frame"].max()) + 1
+    idx = np.arange(len(df)).reshape(n, 33)[:, ID["RIGHT_ELBOW"]]
+    df.loc[idx, "wz"] = 0.45
+
+    ctx = make_run(tmp_path / "fore", df, truth["fps"])
+    for step in (s03_kinematics, s04_phases, s05_stats):
+        assert step.run(ctx).passed
+
+    k = pd.read_parquet(ctx.run_dir / "03_kinematics.parquet")
+    gate = float(ctx.cfg.get("quality_gates.angle_2d3d_disagree_deg"))
+    assert np.nanmedian(k["elbow_draw_deg_2d3d_diff"]) > gate
+    assert np.nanmedian(k["elbow_bow_deg_2d3d_diff"]) < gate
+
+    aim = json.loads((ctx.run_dir / "05_metrics.json").read_text())
+    measures = aim["per_shot"][0]["phases"]["AIM"]["measures"]
+    assert measures["elbow_draw_deg"]["confidence"] == "LOW"
+    assert measures["elbow_draw_deg"]["confidence_reason"] == "FORESHORTENED"
+    assert measures["elbow_draw_deg"]["deg_2d3d_gap"] > gate
+    # The untouched joint keeps its confidence: the flag is not a blanket.
+    assert measures["elbow_bow_deg"].get("confidence_reason") is None
+    # And the evidence file carries the downgrade, so the model inherits it.
+    ev = aim["evidence_index"]
+    assert ev["shot1.AIM.elbow_draw_deg.mean"]["confidence"] == "LOW"

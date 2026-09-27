@@ -60,9 +60,9 @@ if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
 # --- 4. MediaPipe pose model ------------------------------------------------
 $modelDir = Join-Path $repo "models"
 New-Item -ItemType Directory -Force -Path $modelDir | Out-Null
-$modelPath = Join-Path $modelDir "pose_landmarker_full.task"
+$modelPath = Join-Path $modelDir "pose_landmarker_heavy.task"
 if (-not (Test-Path $modelPath)) {
-    $url = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task"
+    $url = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/1/pose_landmarker_heavy.task"
     Write-Host "Downloading MediaPipe pose model (model_complexity 1 == 'full') ..." -ForegroundColor Cyan
     Invoke-WebRequest -Uri $url -OutFile $modelPath -UseBasicParsing
 }

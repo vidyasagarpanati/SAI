@@ -223,6 +223,11 @@ def _fmt(v, dec=1, unit=" deg"):
     return "n/a" if v is None or (isinstance(v, float) and not math.isfinite(v)) else f"{v:.{dec}f}{unit}"
 
 
+# Gap between the image-plane and world angle above which a joint is marked as
+# foreshortened on the overlay. Mirrors quality_gates.angle_2d3d_disagree_deg.
+FORESHORTEN_DEG = 15.0
+
+
 # ------------------------------------------------------------------ main entry
 def render(frame: np.ndarray, pts: np.ndarray, vis: np.ndarray, values: dict, *,
            draw_hand: str, shot: int | None, phase: str | None, t_s: float, frame_idx: int,
@@ -389,17 +394,28 @@ def render(frame: np.ndarray, pts: np.ndarray, vis: np.ndarray, values: dict, *,
         ("SHOULDER", "shoulder", "draw", DRAW_COL), ("ELBOW", "elbow", "draw", DRAW_COL),
         ("WRIST", "wrist", "draw", DRAW_COL),
     ]
+    def joint_text(label: str, key: str) -> str:
+        """Every drawn angle is the IMAGE-PLANE angle, so it can be checked
+        against the pixels around it. A '!' marks a joint whose world-space
+        angle disagrees, meaning it is not square to the camera and the
+        projected value is foreshortened."""
+        text = f"{label}: {_fmt(values.get(key))}"
+        gap = values.get(f"{key}_2d3d_diff")
+        if isinstance(gap, (int, float)) and gap > FORESHORTEN_DEG:
+            text += " !"
+        return text
+
     n_joint = 0
     for label, joint, role, col in joint_specs:
         lm = (bow if role == "bow" else drw)[joint]
         if present[lm]:
-            labels.add(pts[lm], f"{label}: {_fmt(values.get(f'{joint}_{role}_deg'))}", col)
+            labels.add(pts[lm], joint_text(label, f"{joint}_{role}_deg"), col)
             n_joint += 1
     for label, joint in (("HIP", "hip"), ("KNEE", "knee"), ("ANKLE", "ankle")):
         for lr in ("left", "right"):
             lm = L.side(lr.upper())[joint]
             if present[lm]:
-                labels.add(pts[lm], f"{label}: {_fmt(values.get(f'{joint}_{lr}_deg'))}", LEG_COL)
+                labels.add(pts[lm], joint_text(label, f"{joint}_{lr}_deg"), LEG_COL)
                 n_joint += 1
     if n_joint:
         rep.did("joint_angle_labels")
@@ -577,7 +593,9 @@ def _panel(img, mode, phase, shot, t_s, frame_idx, measurements, observation, co
     y = h - int(118 * s)
     line("LEGEND", GRAY, 0.5 * s, True)
     for txt, col in (("face / upper limb / lower limb", WHITE), ("gravity . horizontal . trunk", MAGENTA),
-                     ("bow arm (red)   draw arm (blue)", RED)):
+                     ("bow arm (red)   draw arm (blue)", RED),
+                     ("angles are image-plane (2D)", WHITE),
+                     ("!  joint not square to camera", WHITE)):
         line(txt, col, 0.45 * s)
 
     canvas = np.hstack([img, panel])

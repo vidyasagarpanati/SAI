@@ -229,8 +229,8 @@ old runs stay reproducible and the next run starts fresh under a new run id.
 ## Troubleshooting
 
 **`archery doctor` says the pose model is missing.** Rerun `bootstrap.ps1`, or
-download it by hand to `models\pose_landmarker_full.task` from
-`https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task`.
+download it by hand to `models\pose_landmarker_heavy.task` from
+`https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/1/pose_landmarker_heavy.task`.
 
 **ffprobe not found.** Not fatal. Metadata falls back to OpenCV, which gives fps,
 resolution and frame count but not codec or rotation. Install ffmpeg properly

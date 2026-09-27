@@ -135,6 +135,22 @@ Nothing has been guessed to fill a gap. See Section 20 for the verification reco
   <h3>Full-draw (Aim phase) statistics</h3>
   <table><tr><th>Measure</th><th>Min</th><th>Max</th><th>Mean</th><th>Range</th><th>SD</th><th>Shot-to-shot SD</th><th>Confidence</th></tr>
   {% for r in v.stats_rows %}<tr><td>{{ r.name }}</td><td class="num">{{ r.min }}</td><td class="num">{{ r.max }}</td><td class="num">{{ r.mean }}</td><td class="num">{{ r.range }}</td><td class="num">{{ r.sd }}</td><td>{{ r.xsd }}</td><td>{{ conf(r.conf) }}</td></tr>{% endfor %}</table>
+
+  <h3>Angle measurement space</h3>
+  <p>Every joint angle is measured twice. The <b>image plane</b> value is what the
+  joint subtends in the frame, in pixels, and is the value drawn on the annotated
+  video and quoted throughout this report: it is the only one a reader can check
+  against the picture. The <b>world</b> value is the same angle in the pose model's
+  3D landmarks, whose depth is inferred from a single camera. Where the two
+  disagree the joint is not square to the camera, the projected angle is
+  foreshortened, and its confidence is dropped to LOW.</p>
+  <table><tr><th>Joint</th><th>Image plane (2D)</th><th>World (3D)</th><th>Gap</th><th>Flag</th><th>Confidence</th></tr>
+  {% for r in v.angle_space_rows %}<tr><td>{{ r.name }}</td><td class="num">{{ r.two_d }}</td>
+    <td class="num">{{ r.three_d }}</td><td class="num">{{ r.gap }}</td>
+    <td>{% if r.flag %}<span class="chip c-LOW">{{ r.flag }}</span>{% endif %}</td>
+    <td>{{ conf(r.conf) }}</td></tr>{% endfor %}
+  {% if not v.angle_space_rows %}<tr><td colspan="6" class="na">No aim-phase angles were measured.</td></tr>{% endif %}
+  </table>
   <h3>Interpretation</h3>
   <ul>{% for f in v.n.s05_biomech.findings %}<li><b>{{ f.topic }}:</b> {{ lvl(f.evidence_level) }}{{ conf(f.confidence) }} {{ txt(f.finding) }}</li>{% endfor %}</ul>
 
