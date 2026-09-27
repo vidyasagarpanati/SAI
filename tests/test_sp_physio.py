@@ -214,3 +214,76 @@ def test_physio_inputs_do_not_invalidate_the_video_steps(tmp_path):
     b, _ = normalise_session(session)
     assert a == b
     assert "physio" in SP_OWNED
+
+
+# ---------------------------------------------------------------- end to end
+@pytest.fixture(scope="module")
+def physio_report(tmp_path_factory):
+    """The whole pipeline with physiological inputs present, so the new report
+    sections are rendered rather than only unit-tested."""
+    import synthetic
+    from archery.llm import FakeLLM
+    from archery.steps import (s03_kinematics, s04_phases, s05_stats, s06_annotate,
+                               s08_narrate, s09_verify, s10_render)
+    from helpers import make_run
+
+    base = tmp_path_factory.mktemp("physio_e2e")
+    df, truth = synthetic.build()
+    ctx = make_run(base / "run", df, truth["fps"], frames=(640, 360),
+                   outputs_dir=base / "outputs",
+                   session={"athlete_name": "Kalpana Ragar", "age": 16,
+                            "height_cm": 160.0, "weight_kg": 63.9,
+                            "physio": {"heart_rate": {"rest_bpm": 62, "mean_bpm": 118},
+                                       "force_plate": {"file": str(SAMPLE), "images": []}}})
+    for step in (sp_physio, s03_kinematics, s04_phases, s05_stats, s06_annotate):
+        assert step.run(ctx).passed
+    ctx.llm = FakeLLM()
+    s08_narrate.run(ctx)
+    s09_verify.run(ctx)
+    s10_render.run(ctx)
+    html = sorted((base / "outputs").glob("*.html"))[-1].read_text(encoding="utf-8")
+    return ctx, html
+
+
+def test_physio_evidence_reaches_the_single_evidence_file(physio_report):
+    ctx, _ = physio_report
+    ev = json.loads((ctx.run_dir / "05_metrics.json").read_text())["evidence_index"]
+    assert ev["hr.rest_bpm"]["value"] == 62
+    assert ev["athlete.bmi"]["units"] == "kg/m^2"
+    assert any(k.startswith("posture.DRAW_TO_HOLD_R_10S.") for k in ev)
+    # Source prefixes stay distinct, or the model cannot tell a plate
+    # measurement from a video one.
+    assert not [k for k in ev if k.startswith("posture.") and k.startswith("shot")]
+
+
+def test_report_states_the_inputs_and_their_provenance(physio_report):
+    _, html = physio_report
+    assert "Body Sway" in html or "body_sway_sample.csv" in html
+    assert "Kalpana" in html
+    assert "Tanaka" in html and "ESTIMATE" in html
+    assert "YOUTH ATHLETE" in html          # age 16
+    assert "DRAW_TO_HOLD_R_10S" in html and "FREE_50S" in html
+
+
+def test_report_never_turns_an_unrecorded_channel_into_a_zero(physio_report):
+    _, html = physio_report
+    assert "Measures the instrument did not record" in html
+    assert "Left/right sway velocity ratio" not in html.split(
+        "Measures the instrument did not record")[0]
+    for row in ("left leg", "right leg", "left/right"):
+        assert f"<td>{row}" not in html.lower()
+
+
+def test_report_keeps_the_other_athletes_out(physio_report):
+    _, html = physio_report
+    for other in ("Ansh", "Tanwar", "Samarth", "Tamanna", "Verma"):
+        assert other not in html
+    # Name is printed, date of birth never is.
+    assert "2006-03-04" not in html and "3/4/2006" not in html
+
+
+def test_bmi_carries_no_body_composition_language(physio_report):
+    _, html = physio_report
+    low = html.lower()
+    for word in ("obese", "obesity", "overweight", "underweight", "body fat"):
+        assert word not in low

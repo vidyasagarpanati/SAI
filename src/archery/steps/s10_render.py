@@ -19,6 +19,7 @@ import hashlib
 import json
 import re
 from html.parser import HTMLParser
+from pathlib import Path
 
 import cv2
 
@@ -53,6 +54,21 @@ NICE = {"elbow_bow_deg": "Bow elbow angle", "elbow_draw_deg": "Draw elbow angle"
         "ankle_left_deg": "Ankle angle (left)", "ankle_right_deg": "Ankle angle (right)",
         "stance_width_norm": "Stance width", "anchor_distance_norm": "Anchor distance"}
 UNIT = {"deg": " deg", "shoulder widths": " SW", "shoulder widths/s": " SW/s"}
+PLATE_NICE = {
+    "sway_path_total": "Sway path, total", "sway_path_ap": "Sway path, anterior-posterior",
+    "sway_path_ml": "Sway path, medio-lateral", "sway_v_total": "Sway velocity, total",
+    "sway_v_ap": "Sway velocity, anterior-posterior", "sway_v_ml": "Sway velocity, medio-lateral",
+    "sway_amp_mean_ap": "Mean amplitude, anterior-posterior",
+    "sway_amp_mean_ml": "Mean amplitude, medio-lateral",
+    "sway_amp_max_ap": "Peak amplitude, anterior-posterior",
+    "sway_amp_max_ml": "Peak amplitude, medio-lateral",
+    "sway_area_total": "Sway area", "ellipse_95": "95% prediction ellipse area",
+    "fre_mean_ap": "Mean frequency, anterior-posterior",
+    "fre_mean_ml": "Mean frequency, medio-lateral",
+    "sway_v_endurance": "Sway velocity endurance index",
+    "sway_v_fatigue": "Sway velocity fatigue index",
+    "sway_v_left": "Sway velocity, left leg", "sway_v_right": "Sway velocity, right leg",
+    "lr_sway_v_ratio": "Left/right sway velocity ratio"}
 
 
 def _v(x, unit):
@@ -235,15 +251,46 @@ def build_view(ctx: Context, version_label: str) -> tuple[dict, int, int]:
     for c in re.findall(r'"confidence":\s*"(HIGH|MEDIUM|LOW)"', json.dumps(narr_raw)):
         counts[c] += 1
 
-    physio = {}
-    ph = athlete.get("physio") or {}
-    if isinstance(ph, dict):
-        if ph.get("heart_rate_file"):
-            physio["p1"] = (f"Heart-rate file supplied ({ph['heart_rate_file']}) but no parser is configured "
-                            f"for its format, so it was NOT ASSESSED. No values are reported.")
-        if ph.get("force_plate_file"):
-            physio["p2"] = (f"Force-plate file supplied ({ph['force_plate_file']}) but no parser is configured "
-                            f"for its format, so it was NOT ASSESSED. No values are reported.")
+    # ---- physiological and anthropometric inputs (SP) -------------------------
+    try:
+        pj = ctx.read_json("00b_physio.json")
+    except FileNotFoundError:
+        pj = {}
+    plate = pj.get("force_plate") or {}
+    hr = pj.get("heart_rate") or {}
+    anthro = pj.get("anthropometrics") or {}
+
+    plate_rows = []
+    for cond in plate.get("conditions", []):
+        d = cond["definition"]
+        for name, meas in sorted(cond["measures"].items()):
+            plate_rows.append({
+                "condition": cond["condition"],
+                "task": d.get("upper", ""), "stance": d.get("stance", ""),
+                "duration_s": d.get("duration_s", ""), "n": meas["n"],
+                "measure": PLATE_NICE.get(name, name.replace("_", " ")),
+                "mean": meas["mean"], "sd": meas["sd"], "units": meas["units"]})
+
+    plate_images = []
+    for src in pj.get("force_plate_images", []):
+        try:
+            img = cv2.imread(str(src))
+            if img is not None:
+                plate_images.append({"name": Path(src).name,
+                                     "b64": _b64(img, 900, 82)})
+        except Exception:  # noqa: BLE001 - a missing figure must not lose the report
+            continue
+
+    physio = {
+        "any_input": bool(pj.get("evidence")) or bool(plate_images),
+        "inventory": pj.get("inventory", []),
+        "anthro": anthro, "hr": hr, "plate": plate,
+        "plate_rows": plate_rows, "images": plate_images,
+        "p1": n.get("p1"), "p2": n.get("p2"),
+        "hr_supplied": any(hr.get(k) is not None
+                           for k in ("rest_bpm", "mean_bpm", "max_observed_bpm")),
+        "plate_supplied": bool(plate.get("conditions")),
+    }
 
     usage_path = ctx.narrative_dir / "usage.json"
     usage = json.loads(usage_path.read_text(encoding="utf-8")) if usage_path.is_file() else {}

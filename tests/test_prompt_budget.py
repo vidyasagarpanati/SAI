@@ -14,19 +14,29 @@ import pytest
 from archery.grounding import check_text
 from archery.llm import FakeLLM
 from archery.phase_defs import ORDER
-from archery.report_spec import CALLS, build_prompt
-from archery.steps import s03_kinematics, s04_phases, s05_stats
+from archery.report_spec import build_prompt, required_calls
+from archery.steps import s03_kinematics, s04_phases, s05_stats, sp_physio
 import synthetic
 from helpers import make_run
 
 LIMITS = {"max_evidence_lines": 90, "max_prior_points": 4, "max_prior_chars": 220}
 
 
+SAMPLE = Path(__file__).parent / "data" / "body_sway_sample.csv"
+
+
 @pytest.fixture(scope="module")
 def four_shot(tmp_path_factory):
+    """Worst realistic case: 4 shots, 9 phases, every earlier section present,
+    AND a full force-plate export, which is what makes p2's evidence list the
+    largest in the report."""
     df, truth = synthetic.build_multi(4)
-    ctx = make_run(tmp_path_factory.mktemp("budget"), df, truth["fps"])
-    for step in (s03_kinematics, s04_phases, s05_stats):
+    ctx = make_run(tmp_path_factory.mktemp("budget"), df, truth["fps"],
+                   session={"athlete_name": "Kalpana Ragar", "age": 19,
+                            "height_cm": 160.0, "weight_kg": 63.9,
+                            "physio": {"heart_rate": {"rest_bpm": 62, "mean_bpm": 118},
+                                       "force_plate": {"file": str(SAMPLE), "images": []}}})
+    for step in (sp_physio, s03_kinematics, s04_phases, s05_stats):
         assert step.run(ctx).passed
     m = json.loads((ctx.run_dir / "05_metrics.json").read_text())
     detected = [p for p in ORDER
@@ -37,7 +47,7 @@ def four_shot(tmp_path_factory):
 def test_every_prompt_fits_well_inside_the_context_window(four_shot):
     ctx, m, detected = four_shot
     fake, outs, sizes = FakeLLM(), {}, {}
-    for sid, deps, imgs in CALLS:
+    for sid, deps, imgs in required_calls(m):
         if sid == "s04_phase":
             per = {}
             for ph in detected:
@@ -52,6 +62,8 @@ def test_every_prompt_fits_well_inside_the_context_window(four_shot):
     worst = max(sizes.values())
     assert worst < 6000, f"prompt budget exceeded: {sorted(sizes.items(), key=lambda x: -x[1])[:3]}"
     assert len(detected) == 9 and m["session"]["n_shots"] == 4
+    # The physio sections were actually exercised, not quietly skipped.
+    assert {"p1", "p2"} <= set(sizes)
 
 
 def test_evidence_list_is_capped(four_shot):

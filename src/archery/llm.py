@@ -204,6 +204,29 @@ class FakeLLM:
                                  "confidence": "LOW"} for a in
                                 ["Accuracy", "Grouping", "Arrow flight", "Repeatability", "Pressure performance"]],
                     "notes": "Shot-to-shot consistency requires at least three shots."}
+        if sid == "p1":
+            return {"summary": [{"point": f"Average working heart rate {cite(0)}.",
+                                 "evidence_level": "MEASURED", "confidence": "HIGH",
+                                 "evidence_keys": ek(0)}],
+                    "zone_statement": f"Zone boundaries are derived from {cite(0)}.",
+                    "working_hr_direction": "ABOVE",
+                    "actions": [{"action": "Lengthen the pause between arrows and breathe out "
+                                          "through the shot.",
+                                 "purpose": "Let the working heart rate settle before the release.",
+                                 "evidence_keys": ek(0)}],
+                    "estimate_caveat": "Zone boundaries are an estimate from a population "
+                                       "formula, not a measured threshold.",
+                    "caveats": []}
+        if sid == "p2":
+            item = {"finding": f"Postural sway and the video stability reading agree {cite(0)}.",
+                    "video_basis": "Centre-of-mass speed during aim.",
+                    "confidence": "MEDIUM", "evidence_keys": ek(0)}
+            return {"agreements": [item], "conflicts": [],
+                    "interventions": [{"intervention": "Hold the draw-and-hold position for "
+                                                       "longer in warm-up.",
+                                       "addresses": "Sway and heart rate together.",
+                                       "evidence_keys": ek(0)}],
+                    "not_assessed": ["Left and right leg loading were not recorded."]}
         if sid == "s08_equipment":
             aspects = ["Bow fit", "Draw length", "Arrow length", "Arrow spine indications",
                        "Stabilizer behavior", "String alignment", "Nocking-point clues",

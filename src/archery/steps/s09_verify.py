@@ -17,13 +17,13 @@ from archery import grounding
 from archery.context import Context
 from archery.contracts import WARN, StepResult
 from archery.narrator import Narrator
-from archery.report_spec import (CALLS, MASTER, PRESCRIPTIVE, SKIP_FIELDS, local_checks,
-                                 report_order, schema_for)
+from archery.report_spec import (MASTER, PRESCRIPTIVE, SKIP_FIELDS, local_checks,
+                                 report_order, required_calls, schema_for)
 
 
 def _section_problems(nar: Narrator) -> dict[str, list[str]]:
     probs: dict[str, list[str]] = {}
-    for sid, deps, _ in CALLS:
+    for sid, deps, _ in required_calls(nar.metrics):
         if sid == "s04_phase":
             got = sorted(nar.outputs.get(sid, {}))
             if got != sorted(nar.detected):
@@ -84,7 +84,7 @@ def _checklist(nar: Narrator, sec: dict, cross: dict) -> list[dict]:
              [p.get("score") for p in o.get("s12_scorecard", {}).get("phases", [])]
     injury_ok = not any("diagnostic language" in p for p in sec.get("s10_injury", []))
     rows = [
-        ("All required sections are present.", all(k in o for k, _, _ in CALLS)),
+        ("All required sections are present.", all(k in o for k, _, _ in required_calls(m))),
         ("Section order is unchanged.", master_in_order),
         ("All extracted skill phases were assessed.",
          sorted(o.get("s04_phase", {})) == sorted(nar.detected) and "s12_scorecard" not in sec),
@@ -101,7 +101,7 @@ def _checklist(nar: Narrator, sec: dict, cross: dict) -> list[dict]:
         ("Executive summary matches the detailed findings.", "s01_executive" not in sec and "s01_executive" not in cross),
         ("Final coaching priorities match the ranked weaknesses.",
          "s18_projection_final" not in cross and "s15_priorities" not in cross),
-        ("No required section has been omitted.", all(k in o for k, _, _ in CALLS)),
+        ("No required section has been omitted.", all(k in o for k, _, _ in required_calls(m))),
         ("Benchmarks: only cited entries used.", all(r.get("source") for r in m["benchmarks"]["rows"])),
     ]
     return [{"check": c, "status": "PASS" if ok else "FAIL"} for c, ok in rows]
@@ -117,7 +117,7 @@ def run(ctx: Context) -> StepResult:
         nar.status = _json.loads(status_file.read_text(encoding="utf-8"))
     repairs = []
     rounds = int(ctx.cfg.get("llm.max_retries_per_section", 2))
-    deps_of = {sid: (deps, imgs) for sid, deps, imgs in CALLS}
+    deps_of = {sid: (deps, imgs) for sid, deps, imgs in required_calls(nar.metrics)}
 
     for rnd in range(rounds + 1):
         sec = _section_problems(nar)
@@ -167,7 +167,7 @@ def run(ctx: Context) -> StepResult:
         nar.save("section_status", nar.status)
 
     checklist = _checklist(nar, sec, cross)
-    missing = [sid for sid, _, _ in CALLS if sid not in nar.outputs] + \
+    missing = [sid for sid, _, _ in required_calls(nar.metrics) if sid not in nar.outputs] + \
               [f"s04_phase/{ph}" for ph in nar.detected
                if ph not in (nar.outputs.get("s04_phase") or {})]
     complete = not combined and all(r["status"] == "PASS" for r in checklist) and not missing

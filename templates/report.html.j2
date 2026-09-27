@@ -232,8 +232,137 @@ Nothing has been guessed to fill a gap. See Section 20 for the verification reco
   <h3>Provenance</h3>
   <div class="kv">{% for k2, val in v.provenance %}<div>{{ k2 }}</div><div>{{ val }}</div>{% endfor %}</div>
 
-{% elif k in ("p1", "p2") %}
-  {% if v.physio[k] %}<p>{{ v.physio[k] }}</p>{% else %}<p class="na">NOT PROVIDED - CANNOT BE CONFIRMED. No physiological data file was supplied with this session.</p>{% endif %}
+{% elif k == "p1" %}
+  {% set ph = v.physio %}
+  <h3>Inputs supplied for this session</h3>
+  <table><tr><th>Input</th><th>Status</th><th>Detail</th></tr>
+  {% for i in ph.inventory %}<tr><td>{{ i.input }}</td>
+    <td><span class="chip c-{{ 'HIGH' if i.status == 'SUPPLIED' else 'LOW' }}">{{ i.status }}</span></td>
+    <td>{{ i.detail }}</td></tr>{% endfor %}
+  {% if not ph.inventory %}<tr><td colspan="3" class="na">No athlete or physiological inputs were entered.</td></tr>{% endif %}
+  </table>
+
+  {% if ph.anthro.height_cm or ph.anthro.weight_kg or ph.anthro.age_y %}
+  <h3>Anthropometrics</h3>
+  <div class="kv">
+    <div>Height</div><div>{{ ph.anthro.height_cm or "NOT PROVIDED" }}{% if ph.anthro.height_cm %} cm{% endif %}</div>
+    <div>Weight</div><div>{{ ph.anthro.weight_kg or "NOT PROVIDED" }}{% if ph.anthro.weight_kg %} kg{% endif %}</div>
+    <div>Age</div><div>{{ ph.anthro.age_y or "NOT PROVIDED" }}{% if ph.anthro.age_y %} years{% endif %}</div>
+    <div>BMI</div><div>{% if ph.anthro.bmi %}{{ ph.anthro.bmi }} kg/m<sup>2</sup>
+      <span class="muted">computed as {{ ph.anthro.bmi_formula }}</span>{% else %}NOT PROVIDED{% endif %}</div>
+  </div>
+  <p class="muted">BMI is reported as a computed number only. No health, body-composition or
+  weight-category reading is attached to it. Source: {{ ph.anthro.bmi_source }}</p>
+  {% if ph.anthro.is_youth_athlete %}
+  <p><span class="chip c-MEDIUM">YOUTH ATHLETE</span> Age is below {{ ph.anthro.youth_threshold_y }}.
+  Training volume, load progression and recovery in this report follow youth guidelines and
+  require coach sign-off before use. Source: {{ ph.anthro.youth_source }}</p>
+  {% endif %}
+  {% endif %}
+
+  {% if ph.hr_supplied %}
+  <h3>Heart rate</h3>
+  <div class="kv">
+    <div>Resting</div><div>{{ ph.hr.rest_bpm or "NOT PROVIDED" }}{% if ph.hr.rest_bpm %} bpm{% endif %}</div>
+    <div>Session average</div><div>{{ ph.hr.mean_bpm or "NOT PROVIDED" }}{% if ph.hr.mean_bpm %} bpm{% endif %}</div>
+    <div>Highest observed</div><div>{{ ph.hr.max_observed_bpm or "NOT PROVIDED" }}{% if ph.hr.max_observed_bpm %} bpm{% endif %}</div>
+    <div>Age-predicted maximum</div><div>{% if ph.hr.max_estimated_bpm %}{{ ph.hr.max_estimated_bpm }} bpm
+      <span class="chip c-MEDIUM">ESTIMATE</span>{% else %}NOT PROVIDED{% endif %}</div>
+  </div>
+  {% if ph.hr.zones %}
+  <table><tr><th>Zone</th><th>Intensity</th><th>% of estimated maximum</th><th>Range</th></tr>
+  {% for z in ph.hr.zones %}<tr><td>{{ z.zone }}</td><td>{{ z.name }}</td>
+    <td class="num">{{ z.low_pct }}&ndash;{{ z.high_pct }}%</td>
+    <td class="num">{{ z.low_bpm }}&ndash;{{ z.high_bpm }} bpm</td></tr>{% endfor %}</table>
+  <p class="muted">Every boundary above is an ESTIMATE derived from
+  {{ ph.hr.max_formula }} ({{ ph.hr.max_label }}), not a measured threshold. An individual
+  maximum can differ from the formula by roughly ten beats per minute either way.<br>
+  Maximum: {{ ph.hr.max_source }}<br>Zones: {{ ph.hr.zones_source }}</p>
+  {% endif %}
+  {% endif %}
+
+  {% if ph.p1 %}
+  <h3>Assessment</h3>
+  <ul>{% for s in ph.p1.summary %}<li>{{ s.point }} {{ lvl(s.evidence_level) }} {{ conf(s.confidence) }}</li>{% endfor %}</ul>
+  <p>{{ ph.p1.zone_statement }}</p>
+  <p><b>Working heart rate relative to the band this shot cycle needs:</b>
+     <span class="chip c-{{ 'LOW' if ph.p1.working_hr_direction == 'NOT ASSESSABLE' else 'MEDIUM' }}">{{ ph.p1.working_hr_direction }}</span></p>
+  {% if ph.p1.actions %}
+  <table><tr><th>Action</th><th>Purpose</th></tr>
+  {% for a in ph.p1.actions %}<tr><td>{{ a.action }}</td><td>{{ a.purpose }}</td></tr>{% endfor %}</table>
+  {% endif %}
+  <p class="muted">{{ ph.p1.estimate_caveat }}</p>
+  {% for c in ph.p1.caveats %}<p class="muted">{{ c }}</p>{% endfor %}
+  <p class="muted">This section covers training load, pacing, breathing and recovery only. It is
+  not a clinical assessment and names no medical condition.</p>
+  {% elif not ph.hr_supplied %}
+  <p class="na">NOT PROVIDED - CANNOT BE CONFIRMED. No heart-rate data was supplied with this session.</p>
+  {% endif %}
+
+{% elif k == "p2" %}
+  {% set ph = v.physio %}
+  {% if ph.plate_supplied %}
+  <p>Source: <b>{{ ph.plate.file }}</b>, matched to <b>{{ ph.plate.athlete_matched }}</b>
+     ({{ ph.plate.rows_for_this_athlete }} of {{ ph.plate.rows_in_file }} trials in the file;
+     {{ ph.plate.other_athletes_in_file }} other athlete(s) in the same export were not read).
+     SHA-256 {{ ph.plate.sha256[:16] }}.</p>
+  {% if ph.plate.anthropometric_conflicts %}
+  <p><span class="chip c-LOW">DISAGREEMENT</span>
+  {% for c in ph.plate.anthropometric_conflicts %}{{ c }}. {% endfor %}
+  The entered value was used for this run and is not silently replaced.</p>
+  {% endif %}
+  <h3>Trial conditions</h3>
+  <table><tr><th>Condition</th><th>Task</th><th>Stance</th><th>Duration</th><th>Trials</th></tr>
+  {% for c in ph.plate.conditions %}<tr><td>{{ c.condition }}</td><td>{{ c.definition.upper }}</td>
+    <td>{{ c.definition.stance }}</td><td class="num">{{ c.definition.duration_s }} s</td>
+    <td class="num">{{ c.n_trials }}</td></tr>{% endfor %}</table>
+  <p class="muted">Conditions differ in task and duration, so values are never averaged or
+  compared across them. The condition is part of every evidence key.</p>
+
+  <h3>Postural measures</h3>
+  <table><tr><th>Condition</th><th>Measure</th><th>Mean</th><th>SD</th><th>n</th></tr>
+  {% for r in ph.plate_rows %}<tr><td>{{ r.condition }}</td><td>{{ r.measure }}</td>
+    <td class="num">{{ r.mean }} {{ r.units }}</td>
+    <td class="num">{% if r.sd is none %}<span class="muted">withheld, fewer than {{ ph.plate.min_trials_for_sd }} trials</span>{% else %}{{ r.sd }}{% endif %}</td>
+    <td class="num">{{ r.n }}</td></tr>{% endfor %}</table>
+
+  {% if ph.plate.unavailable_measures %}
+  <h3>Measures the instrument did not record</h3>
+  <table><tr><th>Measure</th><th>Reason</th></tr>
+  {% for name, why in ph.plate.unavailable_measures.items() %}<tr><td>{{ name.replace("_", " ") }}</td><td>{{ why }}</td></tr>{% endfor %}</table>
+  <p class="muted">These channels are reported as unavailable rather than as zero. Reading a
+  zero here as perfect left/right symmetry would be a fabricated finding.</p>
+  {% endif %}
+  {% endif %}
+
+  {% if ph.images %}
+  <h3>Force-plate report figures</h3>
+  {% for im in ph.images %}
+  <figure><img src="data:image/jpeg;base64,{{ im.b64 }}" alt="Force-plate figure {{ im.name }}">
+  <figcaption>{{ im.name }}. Shown as supplied. No value in this report is read from an image.</figcaption></figure>
+  {% endfor %}
+  {% endif %}
+
+  {% if ph.p2 %}
+  <h3>Where the plate and the video agree</h3>
+  {% if ph.p2.agreements %}
+  <table><tr><th>Finding</th><th>Video basis</th><th>Confidence</th></tr>
+  {% for a in ph.p2.agreements %}<tr><td>{{ a.finding }}</td><td>{{ a.video_basis }}</td><td>{{ conf(a.confidence) }}</td></tr>{% endfor %}</table>
+  {% else %}<p class="na">No measure was corroborated by both sources.</p>{% endif %}
+  <h3>Where they conflict</h3>
+  {% if ph.p2.conflicts %}
+  <table><tr><th>Finding</th><th>Video basis</th><th>Confidence</th></tr>
+  {% for a in ph.p2.conflicts %}<tr><td>{{ a.finding }}</td><td>{{ a.video_basis }}</td><td>{{ conf(a.confidence) }}</td></tr>{% endfor %}</table>
+  {% else %}<p>None.</p>{% endif %}
+  {% if ph.p2.interventions %}
+  <h3>Interventions addressing both</h3>
+  <table><tr><th>Intervention</th><th>Addresses</th></tr>
+  {% for i in ph.p2.interventions %}<tr><td>{{ i.intervention }}</td><td>{{ i.addresses }}</td></tr>{% endfor %}</table>
+  {% endif %}
+  {% for t in ph.p2.not_assessed %}<p class="muted">{{ t }}</p>{% endfor %}
+  {% elif not ph.plate_supplied %}
+  <p class="na">NOT PROVIDED - CANNOT BE CONFIRMED. No force-plate export was supplied with this session.</p>
+  {% endif %}
 {% endif %}
 </section>
 {% endfor %}

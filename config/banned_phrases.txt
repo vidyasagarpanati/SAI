@@ -1,4 +1,4 @@
-# Section 10 must be non-diagnostic. Any match blocks publication.
+# Sections 10 and p1 must be non-diagnostic. Any match blocks publication.
 # One pattern per line, case insensitive, matched as a whole word sequence.
 diagnosis
 diagnosed
@@ -19,3 +19,27 @@ strain injury
 requires treatment
 prescribe
 medical condition
+# Heart rate is a training signal here, never a clinical one (system rule 11).
+arrhythmia
+bradycardia
+tachycardia
+palpitations
+hypertension
+blood pressure
+beta blocker
+beta-blocker
+medication
+cardiac
+heart condition
+heart disease
+ecg
+ekg
+overtraining syndrome
+# Anthropometrics carry no body-composition judgement (system rule 12).
+obese
+obesity
+overweight
+underweight
+body fat
+lose weight
+gain weight

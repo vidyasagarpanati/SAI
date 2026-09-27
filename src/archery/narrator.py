@@ -18,7 +18,8 @@ import jsonschema
 from archery import grounding
 from archery.io_guard import guarded_open, guarded_path
 from archery.phase_defs import ORDER
-from archery.report_spec import (CALLS, PRESCRIPTIVE, SKIP_FIELDS, build_prompt, local_checks,
+from archery.report_spec import (CALLS, OPTIONAL, PRESCRIPTIVE, SKIP_FIELDS, build_prompt,
+                                 has_evidence, local_checks, required_calls,
                                  schema_for, valid_ids)
 
 EVIDENCE_LINE = re.compile(r"^\{\{([\w.\-]+)\}\} = ", re.M)
@@ -246,12 +247,19 @@ class Narrator:
     def run_all(self) -> dict:
         failed: dict[str, list[str]] = {}
         retries = 0
-        self.total_calls = len(CALLS) - 1 + len(self.detected)
+        skipped = [sid for sid, _, _ in CALLS
+                   if sid in OPTIONAL and not has_evidence(sid, self.metrics)]
+        self.total_calls = len(CALLS) - 1 - len(skipped) + len(self.detected)
         started_all = _time.time()
         print(f"  S8: {self.total_calls} model call(s) planned "
               f"({len(self.detected)} phase sections + {len(CALLS) - 1} report sections), "
               f"model {self.ctx.cfg.get('llm.model')}", flush=True)
+        if skipped:
+            print(f"  S8: skipping {', '.join(skipped)} (no physiological input supplied); "
+                  f"the report will state NOT PROVIDED for them", flush=True)
         for sid, deps, img_phases in CALLS:
+            if sid in skipped:
+                continue
             if sid == "s04_phase":
                 per = {}
                 for ph in self.detected:

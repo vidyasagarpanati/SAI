@@ -128,6 +128,20 @@ def schema_for(sid: str, ctx: dict) -> dict:
     if sid == "s02_quality":
         return obj(camera_angle=STR, lighting=STR, athlete_visibility=STR, occlusion=STR,
                    motion_blur=STR, clothing_interference=STR, limitations=arr(STR, 1, 8))
+    if sid == "p1":
+        return obj(summary=arr(POINT, 1, 5),
+                   zone_statement=STR,
+                   working_hr_direction=enum(["ABOVE", "WITHIN", "BELOW", "NOT ASSESSABLE"]),
+                   actions=arr(obj(action=STR, purpose=STR, evidence_keys=KEYS), 0, 6),
+                   estimate_caveat=STR,
+                   caveats=arr(STR, 0, 4))
+    if sid == "p2":
+        AGREE = obj(finding=STR, video_basis=STR, confidence=enum(CONF), evidence_keys=KEYS)
+        return obj(agreements=arr(AGREE, 0, 5),
+                   conflicts=arr(AGREE, 0, 5),
+                   interventions=arr(obj(intervention=STR, addresses=STR,
+                                         evidence_keys=KEYS), 0, 5),
+                   not_assessed=arr(STR, 0, 6))
     if sid == "s04_phase":
         return obj(phase=enum([ctx["phase"]]),
                    criteria_groups=arr(enum(list("ABCDEFGH")), 1, 8),
@@ -264,6 +278,10 @@ CALLS: list[tuple[str, list[str], list[str]]] = [
     ("s04_phase", [], []),                     # expanded: one call per detected phase
     ("s05_biomech", ["s04_phase"], []),
     ("s06_consistency", ["s04_phase"], []),
+    # Physio sections. Skipped entirely when no physiological input was supplied,
+    # so a video-only run costs exactly what it costs today.
+    ("p1", [], []),
+    ("p2", ["s05_biomech", "s06_consistency", "p1"], []),
     ("s08_equipment", [], ["STANCE", "AIM", "RELEASE"]),
     ("s09_errors", ["s04_phase", "s05_biomech", "s06_consistency"], []),
     ("s10_injury", ["s04_phase", "s05_biomech", "s09_errors"], []),
@@ -278,6 +296,25 @@ CALLS: list[tuple[str, list[str], list[str]]] = [
                        "s14_weaknesses", "s15_priorities", "s18_projection_final"], []),
 ]
 USES_RUBRIC = {"s11_framework", "s12_scorecard"}
+
+# Sections that are not attempted at all when their evidence source is absent.
+# Asking the model to write NOT PROVIDED costs a call and risks it writing prose
+# instead; the renderer states it for free.
+OPTIONAL = {"p1", "p2"}
+
+
+def required_calls(metrics: dict) -> list[tuple[str, list[str], list[str]]]:
+    """The call plan for THIS run. An optional section whose evidence source was
+    not supplied is not merely unwritten, it is not required either: S9 must not
+    count it missing or try to repair a section that was never attempted."""
+    return [c for c in CALLS if c[0] not in OPTIONAL or has_evidence(c[0], metrics)]
+
+
+def has_evidence(sid: str, metrics: dict) -> bool:
+    prefixes = {"p1": ("hr.",), "p2": ("posture.", "hr.")}.get(sid)
+    if prefixes is None:
+        return True
+    return any(k.startswith(prefixes) for k in metrics.get("evidence_index", {}))
 
 
 # ------------------------------------------------------------------ evidence selection
@@ -353,6 +390,20 @@ def section_base_keys(sid: str, metrics: dict, detected: list[str]) -> list[str]
                 if "elbow_bow" in k or "wrist_bow" in k or "draw_wrist_speed" in k]
     if sid in ("s09_errors", "s10_injury", "s11_framework"):
         return quality_keys(metrics) + phase_keys(metrics, "AIM")
+    if sid == "p1":
+        return ([k for k in ev if k.startswith("hr.")]
+                + [k for k in ev if k.startswith("athlete.")])
+    if sid == "p2":
+        # DRAW_TO_HOLD first: it is the archery-specific condition, and the
+        # evidence cap drops what comes last. Means before SDs for the same
+        # reason. Conditions never mix, so the label stays in every key.
+        post = [k for k in ev if k.startswith("posture.")]
+        def rank(key: str) -> tuple:
+            return (0 if "DRAW" in key else 1, 0 if key.endswith(".mean") else 1, key)
+        return (sorted(post, key=rank)
+                + [k for k in ev if k.startswith("hr.") and ".zone." not in k]
+                + [k for k in ev if k.startswith("athlete.")]
+                + phase_keys(metrics, "AIM"))
     if sid == "s01_executive":
         return ["session.n_shots", "quality.pose_detection_rate_pct"]
     return quality_keys(metrics)
@@ -479,6 +530,27 @@ def local_checks(sid: str, out: dict, detected: list[str], phase: str | None,
         for i, p in enumerate(out["analysis"]):
             if p["evidence_level"] == "MEASURED" and not p["evidence_keys"]:
                 v.append(f"analysis[{i}] is MEASURED but cites no evidence key")
+    elif sid == "p1":
+        # An action that names no evidence is generic coaching, which rule 7
+        # forbids; and a stated direction with no action is an observation
+        # dressed as an intervention.
+        need_keys(out["actions"], "actions")
+        if out["working_hr_direction"] in ("ABOVE", "BELOW") and not out["actions"]:
+            v.append(f"working_hr_direction is {out['working_hr_direction']} "
+                     f"but no action is given")
+        for path, text in walk_strings(out):
+            low = text.lower()
+            for b in banned or []:
+                if re.search(rf"\b{re.escape(b)}\b", low):
+                    v.append(f"{path}: clinical language '{b}' is not allowed in a "
+                             f"heart-rate section")
+    elif sid == "p2":
+        need_keys(out["agreements"] + out["conflicts"], "agreements/conflicts")
+        need_keys(out["interventions"], "interventions")
+        for i, item in enumerate(out["agreements"] + out["conflicts"]):
+            if not any(k.startswith("posture.") for k in item.get("evidence_keys", [])):
+                v.append(f"cross-check[{i}] cites no force-plate key, so there is "
+                         f"nothing to cross-check against the video")
     elif sid == "s09_errors":
         ranks = sorted(e["rank"] for e in out["errors"])
         if ranks != list(range(1, len(ranks) + 1)):
