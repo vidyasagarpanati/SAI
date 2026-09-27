@@ -15,7 +15,7 @@
     "rejected by the S9 verifier and will block report publication."
   ],
   "version": 1,
-  "updated": "2026-09-19",
+  "updated": "2026-09-27",
   "entries": [
     {
       "id": "BOW_ARM_EXTENSION_CONVENTION",
@@ -36,5 +36,75 @@
     "Simsek D. et al., postural stability and centre-of-pressure work in archers",
     "Callaway A. et al., shot-cycle kinematics and performance in recurve archery",
     "Spratford W. and Campbell R., shoulder and scapular mechanics in elite archery"
-  ]
+  ],
+  "physiological": {
+    "_note": [
+      "Formulas, not population targets. They produce ESTIMATES, and every number",
+      "derived from them is printed with the formula name and the word estimate.",
+      "Section p1 may not print a heart-rate boundary that is not derived here."
+    ],
+    "max_heart_rate": {
+      "id": "HR_MAX_TANAKA",
+      "formula": "208 - 0.7 * age_years",
+      "units": "bpm",
+      "evidence_class": "literature",
+      "source": "Tanaka H, Monahan KD, Seals DR. Age-predicted maximal heart rate revisited. Journal of the American College of Cardiology 2001;37(1):153-156.",
+      "label": "Tanaka age-predicted maximum (estimate)",
+      "note": "Preferred over 220 - age, which overestimates in the young and underestimates in older adults. Population formula: an individual value can differ by roughly 10 bpm either way."
+    },
+    "zones_pct_hrmax": {
+      "id": "HR_ZONES_PCT_HRMAX",
+      "units": "% of estimated maximum heart rate",
+      "evidence_class": "coaching_convention",
+      "source": "American College of Sports Medicine. ACSM's Guidelines for Exercise Testing and Prescription, 11th edition, intensity classification by percentage of maximal heart rate.",
+      "bands": [
+        {
+          "zone": "Z1",
+          "name": "very light",
+          "low_pct": 50,
+          "high_pct": 60
+        },
+        {
+          "zone": "Z2",
+          "name": "light",
+          "low_pct": 60,
+          "high_pct": 70
+        },
+        {
+          "zone": "Z3",
+          "name": "moderate",
+          "low_pct": 70,
+          "high_pct": 80
+        },
+        {
+          "zone": "Z4",
+          "name": "vigorous",
+          "low_pct": 80,
+          "high_pct": 90
+        },
+        {
+          "zone": "Z5",
+          "name": "near maximal",
+          "low_pct": 90,
+          "high_pct": 100
+        }
+      ]
+    },
+    "bmi": {
+      "id": "BMI_FORMULA",
+      "formula": "weight_kg / (height_m ** 2)",
+      "units": "kg/m^2",
+      "evidence_class": "literature",
+      "source": "Quetelet index, standard anthropometric definition.",
+      "note": "Printed as a plain computed number with its formula. No category label, no health or body-composition reading is attached to it."
+    },
+    "youth_age_threshold_years": {
+      "id": "YOUTH_LOAD_FLAG",
+      "value": 18,
+      "units": "years",
+      "evidence_class": "coaching_convention",
+      "source": "Lloyd RS, Oliver JL et al. National Strength and Conditioning Association position statement on long-term athletic development. Journal of Strength and Conditioning Research 2016;30(6):1491-1509.",
+      "note": "Below this age the plan states that volume, load progression and recovery follow youth guidelines and need coach sign-off. No load numbers are invented."
+    }
+  }
 }

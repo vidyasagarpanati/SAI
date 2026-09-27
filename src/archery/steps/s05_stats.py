@@ -349,6 +349,31 @@ def run(ctx: Context) -> StepResult:
         "evidence_index": evidence,
     }
 
+    # Non-video evidence from SP. Merged here so the report has ONE evidence
+    # file, and added to the payload only when it is non-empty: an empty physio
+    # block would change this file's bytes on every run with no inputs and
+    # needlessly invalidate the sixteen-minute annotate step downstream.
+    physio_evidence = {}
+    try:
+        physio = ctx.read_json("00b_physio.json")
+    except FileNotFoundError:
+        physio = {}
+    physio_evidence = physio.get("evidence") or {}
+    if physio_evidence:
+        collisions = sorted(set(physio_evidence) & set(evidence))
+        if collisions:
+            raise ValueError(
+                f"Physiological keys collide with video keys: {collisions}. "
+                f"Source prefixes must stay distinct or the model cannot tell "
+                f"a plate measurement from a video one.")
+        evidence.update(physio_evidence)
+        payload["physio"] = {
+            "inventory": physio.get("inventory", []),
+            "anthropometrics": physio.get("anthropometrics", {}),
+            "heart_rate": physio.get("heart_rate", {}),
+            "force_plate": physio.get("force_plate", {}),
+        }
+
     text = json.dumps(payload, indent=2, allow_nan=False, default=str)
     from archery.io_guard import guarded_open
     out = ctx.artefact("05_metrics.json")
@@ -358,6 +383,10 @@ def run(ctx: Context) -> StepResult:
     # ---- verification ---------------------------------------------------------
     res.check("metrics_written_without_nan", True, f"{len(text) / 1024:.0f} KB, strict JSON (no NaN)")
     res.check("evidence_index_populated", len(evidence) > 0, f"{len(evidence)} evidence entries")
+    res.check("physio_evidence_merged", True,
+              f"{len(physio_evidence)} physiological key(s) merged from SP"
+              if physio_evidence else
+              "No physiological inputs. Sections p1 and p2 will render NOT PROVIDED.")
     leaks = [f"{code}.{m}" for code in cross for m, c in cross[code].items()
              if c.get("sd") is not None and c["n_shots"] < min_shots]
     res.check("sd_suppressed_below_min_shots", not leaks,

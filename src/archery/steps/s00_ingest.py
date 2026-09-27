@@ -122,9 +122,14 @@ def probe_video(video: Path) -> dict[str, Any]:
     return probe
 
 
+# Owned by SP and deliberately kept out of 00_ingest.json. If S0 echoed these,
+# changing a heart rate would change S0's output hash and re-run S5 and S6.
+SP_OWNED = ("height_cm", "weight_kg", "physio", "inputs_raw", "inputs_unparsed")
+
+
 def normalise_session(raw: dict) -> tuple[dict, list[str]]:
     """Fill absent optional fields with the protocol's explicit 'not provided' string."""
-    out = dict(raw)
+    out = {k: v for k, v in raw.items() if k not in SP_OWNED}
     missing = []
     for field in REQUIRED_SESSION_FIELDS:
         value = out.get(field)

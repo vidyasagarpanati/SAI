@@ -15,7 +15,12 @@ from archery.context import Context
 from archery.contracts import StepFailed, StepResult, UpstreamFailed, dump_result
 from archery.runstate import DONE, STEP_NAMES, STEP_ORDER, RunState
 
-_MODULE_FOR = {sid: f"archery.steps.s{int(sid[1:]):02d}_{STEP_NAMES[sid]}" for sid in STEP_ORDER}
+# Numbered steps map to sNN_<name>. SP is out of band on purpose: it consumes no
+# video, so it must not take a number that implies a place in the video pipeline.
+_MODULE_OVERRIDE = {"SP": "archery.steps.sp_physio"}
+_MODULE_FOR = {sid: _MODULE_OVERRIDE.get(sid, "")
+               or f"archery.steps.s{int(sid[1:]):02d}_{STEP_NAMES[sid]}"
+               for sid in STEP_ORDER}
 
 
 def load_step(step_id: str):
@@ -60,8 +65,19 @@ def _hash_files(paths) -> str:
 #   config  : config slices (see Config.slice_hash)
 #   session : session.json fields this step reads
 STEP_DEPS: dict[str, dict[str, list[str]]] = {
-    "S0": {"steps": [], "config": [], "session": ["*"],
+    # NOT ["*"]: the physio inputs live in the session file too, and hashing them
+    # here would change 00_ingest.json and cascade all the way into S6, which
+    # costs sixteen minutes. S0 depends only on what it actually writes.
+    "S0": {"steps": [], "config": [],
+           "session": ["athlete_name", "age", "gender", "bow_type", "discipline",
+                       "draw_hand", "camera_view", "camera_distance_m", "session_date",
+                       "declared_frame_rate", "number_of_shots_expected",
+                       "additional_data", "notes"],
            "code": ["steps/s00_ingest.py"]},
+    "SP": {"steps": [], "config": ["benchmarks", "stats"],
+           "session": ["athlete_name", "age", "height_cm", "weight_kg", "physio"],
+           "files": ["physio.force_plate.file", "physio.force_plate.images"],
+           "code": ["steps/sp_physio.py", "forceplate.py"]},
     "S1": {"steps": [], "config": ["frames"], "session": [],
            "code": ["steps/s01_frames.py", "steps/s00_ingest.py"]},
     "S2": {"steps": ["S1"], "config": ["pose", "paths.pose_model_file", "quality_gates"],
@@ -72,7 +88,8 @@ STEP_DEPS: dict[str, dict[str, list[str]]] = {
     "S4": {"steps": ["S1", "S3"], "config": ["phase_rules", "quality_gates"],
            "session": ["manual_phase_overrides", "number_of_shots_expected"],
            "code": ["steps/s04_phases.py", "phase_defs.py"]},
-    "S5": {"steps": ["S0", "S2", "S3", "S4"], "config": ["stats", "benchmarks", "quality_gates"],
+    "S5": {"steps": ["S0", "SP", "S2", "S3", "S4"],
+           "config": ["stats", "benchmarks", "quality_gates"],
            "session": [], "code": ["steps/s05_stats.py"]},
     "S6": {"steps": ["S1", "S3", "S4", "S5"], "config": ["render"], "session": [],
            "code": ["steps/s06_annotate.py", "overlay.py", "framedata.py", "phase_defs.py"]},
@@ -84,7 +101,7 @@ STEP_DEPS: dict[str, dict[str, list[str]]] = {
     "S9": {"steps": ["S5", "S8"], "config": ["llm", "prompts", "benchmarks", "report"],
            "session": [],
            "code": ["steps/s09_verify.py", "narrator.py", "report_spec.py", "grounding.py"]},
-    "S10": {"steps": ["S0", "S5", "S6", "S8", "S9"], "config": ["render", "report"],
+    "S10": {"steps": ["S0", "SP", "S5", "S6", "S8", "S9"], "config": ["render", "report"],
             "session": ["*"],
             "code": ["steps/s10_render.py", "overlay.py", "grounding.py", "framedata.py",
                      "../../templates/report.html.j2"]},
@@ -130,6 +147,15 @@ def compute_input_hash(ctx: Context, step_id: str) -> str:
     else:
         session_part = {k: ctx.session.get(k) for k in deps["session"]}
     h.update(json.dumps(session_part, sort_keys=True, default=str).encode())
+    # Files named by the session but living outside the run directory. Hashing
+    # the path alone is not enough: an export edited in place must re-run SP.
+    for path_expr in deps.get("files", []):
+        node = ctx.session
+        for key in path_expr.split("."):
+            node = node.get(key) if isinstance(node, dict) else None
+        items = node if isinstance(node, list) else ([node] if node else [])
+        h.update(path_expr.encode())
+        h.update(_hash_files(items).encode())
     for up in deps["steps"]:
         h.update(str(state.data["steps"].get(up, {}).get("output_hash")).encode())
     return h.hexdigest()[:16]

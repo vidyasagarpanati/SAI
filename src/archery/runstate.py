@@ -17,9 +17,9 @@ from archery.io_guard import guarded_open
 
 PENDING, RUNNING, DONE, FAILED, SKIPPED = "PENDING", "RUNNING", "DONE", "FAILED", "SKIPPED"
 
-STEP_ORDER = ["S0", "S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9", "S10"]
+STEP_ORDER = ["S0", "SP", "S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9", "S10"]
 STEP_NAMES = {
-    "S0": "ingest", "S1": "frames", "S2": "pose", "S3": "kinematics",
+    "S0": "ingest", "SP": "physio", "S1": "frames", "S2": "pose", "S3": "kinematics",
     "S4": "phases", "S5": "stats", "S6": "annotate", "S7": "video",
     "S8": "narrate", "S9": "verify", "S10": "render",
 }
