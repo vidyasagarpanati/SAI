@@ -222,7 +222,91 @@ Guardrails unchanged: the CSV and any images are opened `O_RDONLY` through
 `io_guard`, nothing is written outside the run directory, and the HTML stays
 versioned `_vNN`.
 
-### 2.7 Verification steps for this feature
+### 2.7 CLI surface
+
+Rule that decides the design: the resume cache keys every step on config, session
+fields, upstream hashes and source code. Anything typed on the command line must
+therefore be written into the session file before a step runs, or the cache would
+not see it and a changed input would silently reuse a stale report. So the flags
+below are only a way to fill `session.json`; the file stays the single source of
+truth, and `run` snapshots the resolved version into the run directory as
+`00_session_resolved.json`, which is what gets hashed and what the report's
+provenance block prints.
+
+Three ways in, same destination.
+
+**1. Interactive, matches the "type it at the start" model**
+
+```
+archery init-session --video "C:\Users\w10\Documents\Testing Ai\Kalapna.mov" --ask
+```
+
+Prompts field by field, echoes what it understood, writes the session file and
+exits without running anything.
+
+**2. Flags**
+
+```
+archery init-session ^
+  --video "C:\Users\w10\Documents\Testing Ai\Kalapna.mov" ^
+  --athlete "Kalpana Ragar" ^
+  --profile "Height: 160 cms; Weight: 63.9 kgs; Age: 20 years; Resting HR: 62 bpm; Average HR: 118 bpm" ^
+  --force-plate "C:\Users\w10\Documents\Testing Ai\Body Sway.csv" ^
+  --force-plate-image "C:\...\plate_report_p1.png"
+```
+
+`--profile` takes the free-text block with `;` standing in for a line break,
+because multi-line quoting differs between cmd and PowerShell. `--profile-file`
+takes the same text from a file, one field per line, and is the better route for
+anything longer than a line. `--force-plate-image` repeats. `--hr-file` takes the
+optional `time,bpm` CSV.
+
+**3. Same flags on `run`**
+
+```
+archery run --video "...\Kalapna.mov" --profile-file profile.txt --force-plate "...\Body Sway.csv"
+```
+
+Updates the session file first, then runs. Without flags, `run` uses whatever the
+session file already holds, so the normal second run is just `archery run --video ...`.
+
+**Echo-back, printed before any step starts**
+
+```
+INPUTS UNDERSTOOD
+  height_cm       160.0    free text
+  weight_kg        63.9    free text
+  age_y              20    free text
+  hr_rest_bpm        62    free text
+  hr_mean_bpm       118    free text
+  force_plate     Body Sway.csv -> "Kalpana Ragar", 4 trials, 3 conditions
+  hr_file         NOT PROVIDED
+  plate_images    NOT PROVIDED
+CROSS-CHECK AGAINST FORCE PLATE
+  height_cm  typed 160.0  file 160.0  agree
+  weight_kg  typed  63.9  file  63.9  agree
+UNPARSED, kept as notes and never used as evidence
+  "morning session, slight headwind"
+Proceed? [y/N]
+```
+
+`--yes` skips the confirmation for unattended runs. A value outside its
+plausible range (height 100-250 cm, weight 20-200 kg, age 5-100 y, heart rate
+25-230 bpm) is rejected with the offending line quoted, never clamped and never
+silently dropped.
+
+**Schema additions** (`schemas/session.schema.json`): top-level `height_cm` and
+`weight_kg` alongside the existing `age`; `inputs_raw` holding the free-text block
+verbatim for provenance; `physio` expanded to
+`heart_rate {rest_bpm, mean_bpm, max_bpm, file}` and
+`force_plate {file, athlete_match, images[]}`.
+
+**Cost of changing an input.** Editing the profile or swapping the CSV changes
+only the S0P hash, so S0P, S5, S8, S9 and S10 re-run and S0 to S4, S6 and S7 are
+served from cache. Pose estimation and the annotated video are not repeated,
+which is the whole reason physio ingest is its own step.
+
+### 2.8 Verification steps for this feature
 
 New file `tests/test_s0p_physio.py`, plus additions where noted.
 
