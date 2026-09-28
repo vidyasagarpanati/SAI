@@ -1,7 +1,8 @@
 # 04 - Cross-video comparison (`archery compare`)
 
-Status: SPEC. No code written. Blocked on the phase list from the ChatGPT
-thread, which may change the taxonomy everything below is built on.
+Status: BUILT. `archery compare` ships. The phase list from the ChatGPT thread
+never arrived, so this is built on the nine phases S4 already detects; a
+different taxonomy would land in S4 first and every chart here follows it.
 
 ## What it is for
 
@@ -111,3 +112,37 @@ Writes:
   follow-through, recovery). If that thread defines a different set or
   different boundaries, it changes S4 and `phase_rules.yaml`, and every chart
   here is drawn on top of it.
+
+
+## Part 2 - What shipped
+
+| File | What it does |
+|---|---|
+| `src/archery/compare.py` | Reads each run's 05_metrics.json, flattens shots, leave-one-out baselines, deviations, comparability groups. |
+| `src/archery/charts.py` | Inline SVG: the shot timeline and the small-multiple facets. No script, no plotting dependency. |
+| `src/archery/compare_report.py` | Writes `compare_evidence.json`, then the versioned self-contained HTML. |
+| `templates/compare.html.j2` | Layout only; charts arrive as markup. Light and dark. |
+| `src/archery/cli.py` | The `compare` subcommand. |
+| `tests/test_compare.py` | 15 tests, one per verification step, run against real S5 output. |
+
+### Colour, and why phases are not colour-coded
+
+Nine phases cannot be a colourblind-safe categorical palette, and a nine-step
+single-hue ordinal ramp fails its adjacent-lightness check (validated: adjacent
+dL 0.047, needs 0.06). So colour carries no phase identity at all. Each segment
+is directly labelled with its badge, the legend maps badge to name in cycle
+order, a native SVG `<title>` gives the full name and duration on hover, and
+the data table repeats everything. Two blue steps alternate only to make a
+boundary visible; both were validated against the chart surface in light and
+dark (all checks pass).
+
+### Things the first render got wrong, and now does not
+
+- Axis ticks printed 0.475 and 0.45 both as "0.5". Tick decimals are now
+  derived from the step size.
+- A phase identical in every shot was drawn as three dots on an invented axis,
+  implying variation that was not there. It now prints the value and says
+  "identical in all n shots, no variation to chart".
+- The deviation marker escaped the plot area onto the panel title. It is
+  clamped, and a panel with flags gets extra headroom.
+- The x-axis title collided with the first tick. It moved into the caption.

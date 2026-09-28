@@ -89,7 +89,6 @@ def shot_timeline(payload: dict, row_h: int = 26, pad_left: int = 132,
         x = pad_left + plot_w * t / longest
         out.append(f'<line class="grid" x1="{x:.1f}" y1="{top - 8}" x2="{x:.1f}" y2="{height - 14}"/>')
         out.append(f'<text class="tick" x="{x:.1f}" y="{top - 14}" text-anchor="middle">{t:g}s</text>')
-    out.append('<text class="axis-title" x="4" y="14">seconds from the start of the shot</text>')
 
     for kind, s, ry in rows:
         if kind == "header":
@@ -133,7 +132,9 @@ def timeline_legend(payload: dict) -> str:
         f'<span class="lg"><b>{esc(payload["phase_badges"][c])}</b> {esc(payload["phase_names"][c])}</span>'
         for c in payload["phase_order"])
     return (f'<div class="legend">{items}</div>'
-            '<p class="cap">Segments alternate shade only so the boundaries are visible; '
+            '<p class="cap">Every bar starts at zero: the x axis is seconds from the start '
+            'of that shot, not clock time, so shots filmed weeks apart sit on one '
+            'scale. Segments alternate shade only so the boundaries are visible; '
             'the badge on each segment names the phase. A hollow segment rests on a '
             'LOW-confidence boundary. A phase that was not detected is absent from the '
             'bar, never drawn as zero.</p>')
