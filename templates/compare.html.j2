@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Archery Shot Comparison - {{ v.title }}</title>
+<style>
+:root{--ink:#1d2330;--muted:#5d6678;--line:#dfe3ea;--bg:#f6f7fa;--card:#fff;--accent:#1f4e79;
+--hi:#1e7d4f;--me:#b7791f;--lo:#b8322a;--chip:#eef1f6;
+--seg-a:#86b6ef;--seg-b:#2a78d6;--seg-a-ink:#0b0b0b;--seg-b-ink:#fcfcfb;
+--series:#2a78d6;--critical:#d03b3b;--grid:#e1e0d9;--axis:#898781}
+@media (prefers-color-scheme:dark){:root:where(:not([data-theme="light"])){
+--ink:#fff;--muted:#c3c2b7;--line:#2c2c2a;--bg:#0d0d0d;--card:#1a1a19;--accent:#86b6ef;
+--chip:#26262400;--seg-a:#cde2fb;--seg-b:#5598e7;--seg-a-ink:#0b0b0b;--seg-b-ink:#0b0b0b;
+--series:#3987e5;--critical:#d03b3b;--grid:#2c2c2a;--axis:#898781}}
+:root[data-theme="dark"]{--ink:#fff;--muted:#c3c2b7;--line:#2c2c2a;--bg:#0d0d0d;--card:#1a1a19;
+--accent:#86b6ef;--seg-a:#cde2fb;--seg-b:#5598e7;--seg-a-ink:#0b0b0b;--seg-b-ink:#0b0b0b;
+--series:#3987e5;--grid:#2c2c2a}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+color:var(--ink);background:var(--bg)}
+header.top{background:linear-gradient(120deg,#12324f,#1f4e79);color:#fff;padding:26px 32px}
+header.top h1{margin:0 0 4px;font-size:23px;letter-spacing:.3px}
+header.top .sub{opacity:.85;font-size:13px}
+main{max-width:1180px;margin:0 auto;padding:20px 16px 60px}
+section{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:20px 24px;margin:18px 0}
+section h2{margin:0 0 6px;font-size:19px;color:var(--accent);border-bottom:2px solid var(--line);padding-bottom:8px}
+section h3{font-size:15px;margin:18px 0 6px}
+p.cap{font-size:12.5px;color:var(--muted);margin:6px 0 0}
+table{border-collapse:collapse;width:100%;margin:8px 0 14px;font-size:13.5px}
+th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+th{background:var(--chip)}
+td.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.chip{display:inline-block;font-size:11px;font-weight:600;padding:1px 7px;border-radius:10px;background:var(--chip);color:var(--ink)}
+.c-HIGH{background:#e3f4ec;color:var(--hi)}.c-MEDIUM{background:#fbf1de;color:var(--me)}.c-LOW{background:#fbe6e4;color:var(--lo)}
+.na{color:var(--muted);font-style:italic}
+.warn{background:#fff4e5;border:1px solid #f0d3a5;border-left:6px solid var(--me);border-radius:8px;padding:12px 16px;margin:10px 0;font-size:13.5px}
+.kv{display:grid;grid-template-columns:230px 1fr;gap:4px 14px;font-size:13.5px}
+.kv div:nth-child(odd){color:var(--muted)}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;margin:8px 0 0;font-size:12.5px;color:var(--muted)}
+.legend .lg b{color:var(--ink);font-family:ui-monospace,Menlo,Consolas,monospace}
+.chart{width:100%;height:auto;display:block}
+.facets{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;margin-top:10px}
+.facet{width:100%;height:auto}
+svg text{font:11px system-ui,-apple-system,"Segoe UI",sans-serif;fill:var(--muted)}
+svg .facet-title{font-size:12.5px;font-weight:600;fill:var(--ink)}
+svg .facet-sub,svg .tick,svg .axis-title{font-size:10.5px;fill:var(--axis);font-variant-numeric:tabular-nums}
+svg .rowlab,svg .total{font-size:11px;fill:var(--muted);font-variant-numeric:tabular-nums}
+svg .group{font-size:12px;font-weight:600;fill:var(--ink)}
+svg .grid{stroke:var(--grid);stroke-width:1}
+svg .mean{stroke:var(--axis);stroke-width:1;stroke-dasharray:4 3}
+svg .trend{fill:none;stroke:var(--series);stroke-width:2;stroke-linejoin:round}
+svg .dot{fill:var(--series);stroke:var(--card);stroke-width:2}
+svg .dot.flag{fill:var(--critical)}
+svg .flagmark{fill:var(--critical)}
+svg .seg-a{fill:var(--seg-a)}svg .seg-b{fill:var(--seg-b)}
+svg .soft{fill:none;stroke:var(--seg-b);stroke-width:1.5;stroke-dasharray:3 2}
+svg .flatval{font-size:17px;font-weight:600;fill:var(--ink);font-variant-numeric:tabular-nums}
+svg .badge{font-size:9.5px;font-weight:700;font-family:ui-monospace,Menlo,Consolas,monospace}
+svg .seg-a-ink{fill:var(--seg-a-ink)}svg .seg-b-ink{fill:var(--seg-b-ink)}
+footer{color:var(--muted);font-size:12px;text-align:center;margin-top:30px}
+@media (max-width:720px){.kv{grid-template-columns:1fr}section{padding:16px}}
+@media print{section{break-inside:avoid-page}}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Shot comparison across sessions</h1>
+  <div class="sub">{{ v.title }} &middot; {{ v.payload.totals.sessions }} sessions,
+    {{ v.payload.totals.shots }} shots &middot; generated {{ v.generated }} &middot; {{ v.version_label }}</div>
+</header>
+<main>
+
+<section>
+  <h2>What is being compared</h2>
+  <table><tr><th>#</th><th>Run</th><th>Athlete</th><th>Session date</th><th>Camera view</th>
+    <th>Shots</th><th>Measured fps</th></tr>
+  {% for s in v.payload.sessions %}<tr><td>{{ s.label }}</td><td>{{ s.run_id }}</td>
+    <td>{{ s.athlete }}</td><td>{{ s.session_date or "NOT PROVIDED" }}</td>
+    <td>{{ s.camera_view }}</td><td class="num">{{ s.n_shots }}</td>
+    <td class="num">{{ "%.2f"|format(s.measured_fps) if s.measured_fps else "n/a" }}</td></tr>{% endfor %}
+  </table>
+  <p class="cap">Sessions are shown in the order the runs were passed on the command line.
+  Nothing has been reordered.</p>
+
+  {% for w in v.payload.warnings %}<div class="warn">{{ w }}</div>{% endfor %}
+  {% if v.payload.skipped_runs %}<div class="warn">Excluded:
+    {% for s in v.payload.skipped_runs %}<b>{{ s.run_id }}</b> ({{ s.reason }}){% if not loop.last %}; {% endif %}{% endfor %}</div>{% endif %}
+
+  <h3>What may be compared, and what may not</h3>
+  <p class="cap">Phase durations are in seconds and the true capture rate is measured per
+  video, so they compare across every session here. Joint angles are image-plane
+  projections, so a session filmed from a different position measures a different
+  quantity under the same name; those charts are drawn only within a camera view.
+  Anchor distance is normalised by shoulder width and travels between views.</p>
+</section>
+
+<section>
+  <h2>Shot timeline</h2>
+  {{ v.timeline }}
+  {{ v.timeline_legend }}
+</section>
+
+<section>
+  <h2>Phase duration, session by session</h2>
+  <p class="cap">One panel per phase. Each dot is one shot, the line joins the session
+  means, and the dashed line is the pooled mean across every shot here. A red dot with
+  a triangle above it is flagged: its duration sits more than
+  {{ v.payload.sd_threshold }} standard deviations from the mean of <b>all the other
+  shots</b>, computed without that shot, so an unusual shot cannot pull the line it is
+  judged against toward itself. The dashed pooled mean is for orientation only; the
+  table below is what the flags are computed from.</p>
+  {{ v.phase_facets }}
+</section>
+
+<section>
+  <h2>Shots outside the athlete's own range</h2>
+  {% if v.payload.deviations %}
+  <table><tr><th>Shot</th><th>Phase</th><th>Duration</th><th>Baseline mean</th>
+    <th>Baseline SD</th><th>n others</th><th>z</th><th></th><th>Boundary</th></tr>
+  {% for d in v.payload.deviations %}<tr><td>{{ d.shot }}{% if v.multi_athlete %} ({{ d.athlete }}){% endif %}</td>
+    <td>{{ d.phase_name }}</td><td class="num">{{ "%.3f"|format(d.duration_s) }} s</td>
+    <td class="num">{{ "%.3f"|format(d.baseline_mean_s) }} s</td>
+    <td class="num">{{ "%.3f"|format(d.baseline_sd_s) }} s</td>
+    <td class="num">{{ d.n_others }}</td><td class="num">{{ "%+.2f"|format(d.z) }}</td>
+    <td>{{ d.direction }}</td>
+    <td><span class="chip c-{{ d.boundary_confidence or 'LOW' }}">{{ d.boundary_confidence or "n/a" }}</span></td></tr>{% endfor %}
+  </table>
+  <p class="cap">Ranked by how far the shot sits from the rest, largest first. A LOW
+  boundary confidence means the phase edge itself was hard to place, so the deviation
+  rests on a soft measurement and should be checked against the annotated video before
+  it is acted on.</p>
+  {% else %}
+  <p class="na">No shot sits more than {{ v.payload.sd_threshold }} standard deviations from
+  the others on any phase.{% if v.no_sd_phases %} Note that {{ v.no_sd_phases }} had too
+  few shots for a standard deviation, so nothing could be flagged there.{% endif %}</p>
+  {% endif %}
+</section>
+
+{% if v.position_facets %}
+<section>
+  <h2>Positions over time</h2>
+  <p class="cap">Measured at each shot's aim key frame. Drawn only where two or more
+  sessions share a camera view.</p>
+  {{ v.position_facets }}
+  {% if v.position_excluded %}<p class="cap">Not comparable, so not drawn:
+    {{ v.position_excluded }}.</p>{% endif %}
+</section>
+{% endif %}
+
+<section>
+  <h2>Every value behind the charts</h2>
+  <p class="cap">The table view of the same data, for reading without colour and for
+  checking a chart against a number.</p>
+  <table><tr><th>Shot</th><th>Session</th>{% if v.multi_athlete %}<th>Athlete</th>{% endif %}
+    {% for c in v.payload.phase_order %}<th>{{ v.payload.phase_badges[c] }}</th>{% endfor %}
+    <th>Total</th></tr>
+  {% for s in v.payload.shots %}<tr><td>{{ s.label }}</td><td>{{ s.session_label }}</td>
+    {% if v.multi_athlete %}<td>{{ s.athlete }}</td>{% endif %}
+    {% for c in v.payload.phase_order %}<td class="num">{% if c in s.phases and s.phases[c].duration_s is not none %}{{ "%.3f"|format(s.phases[c].duration_s) }}{% else %}<span class="na">not detected</span>{% endif %}</td>{% endfor %}
+    <td class="num">{{ "%.3f"|format(s.total_s) if s.total_s is not none else "n/a" }}</td></tr>{% endfor %}
+  </table>
+  <p class="cap">Durations in seconds. Badges: {% for c in v.payload.phase_order %}<b>{{ v.payload.phase_badges[c] }}</b> {{ v.payload.phase_names[c] }}{% if not loop.last %}, {% endif %}{% endfor %}.</p>
+
+  <h3>Provenance</h3>
+  <div class="kv">{% for k, val in v.provenance %}<div>{{ k }}</div><div>{{ val }}</div>{% endfor %}</div>
+</section>
+
+<footer>Generated by the SAI archery biomechanics pipeline &middot; read-only over finished runs</footer>
+</main>
+</body>
+</html>

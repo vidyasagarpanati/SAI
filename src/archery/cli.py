@@ -10,6 +10,7 @@
     archery run --video ... --from S8 --force  # redo the narrative
     archery status
     archery status <run_id>
+    archery compare --runs Kalapna__a8964b39 Kalapna__3f21c0de --out kalpana_6wk
 """
 from __future__ import annotations
 
@@ -453,6 +454,45 @@ def cmd_run(args) -> int:
     return 0
 
 
+def cmd_compare(args) -> int:
+    from archery.compare import CompareError, build
+    from archery.compare_report import render
+
+    cfg = _bootstrap(args.root)
+    runs_dir = cfg.paths.runs_dir
+    label = args.out or "_".join(r.split("__")[0] for r in dict.fromkeys(args.runs))[:60]
+    try:
+        payload = build(runs_dir, list(args.runs), float(args.sd),
+                        int(cfg.get("stats.min_shots_for_sd", 3)))
+    except CompareError as exc:
+        raise SystemExit(str(exc))
+
+    print(f"runs   : {len(payload['sessions'])} read, "
+          f"{len(payload['skipped_runs'])} skipped")
+    for s in payload["sessions"]:
+        print(f"  {s['label']:<4} {s['run_id']:<28} {s['n_shots']} shot(s)  "
+              f"{s['session_date'] or 'no date'}  {s['camera_view']}")
+    for s in payload["skipped_runs"]:
+        print(f"  ---  {s['run_id']}: {s['reason']}")
+    print(f"shots  : {payload['totals']['shots']}")
+    for w in payload["warnings"]:
+        print(f"\n[warn] {w}")
+
+    target, evidence = render(payload, cfg.paths.outputs_dir,
+                              runs_dir / "_compare" / safe_label(label), label)
+    print(f"\nflagged: {len(payload['deviations'])} shot-phase(s) beyond {args.sd} SD")
+    for d in payload["deviations"][:6]:
+        print(f"  {d['shot']:<12} {d['phase_name']:<22} {d['duration_s']:.3f}s  "
+              f"z={d['z']:+.2f}  {d['direction']}")
+    print(f"\nreport  : {target}\nevidence: {evidence}")
+    return 0
+
+
+def safe_label(text: str) -> str:
+    from archery.versioning import safe
+    return safe(text)
+
+
 def cmd_status(args) -> int:
     cfg = _bootstrap(args.root)
     runs_dir = cfg.paths.runs_dir
@@ -522,6 +562,15 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--athlete", help="Override the athlete name in the session file.")
     add_input_args(r, ask=False)
     r.set_defaults(func=cmd_run)
+
+    c = sub.add_parser("compare", help="Compare finished runs across sessions.")
+    c.add_argument("--runs", nargs="+", required=True, metavar="RUN_ID",
+                   help="Run ids, in the order they should appear on the time axis.")
+    c.add_argument("--out", help="Label for the output file. Defaults to the video stems.")
+    c.add_argument("--sd", default=2.0, type=float,
+                   help="How many leave-one-out standard deviations count as a "
+                        "deviation. Default 2.")
+    c.set_defaults(func=cmd_compare)
 
     s = sub.add_parser("status", help="Show the state of a run.")
     s.add_argument("run_id", nargs="?")
