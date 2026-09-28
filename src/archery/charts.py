@@ -186,7 +186,13 @@ def _facet(title: str, subtitle: str, points: list[dict], flagged: set,
         out.append(f'<text class="tick" x="{pad_l - 6}" y="{y + 3:.1f}" '
                    f'text-anchor="end">{t:.{dp}f}</text>')
     for i, lab in enumerate(x_labels):
-        out.append(f'<text class="tick" x="{X(i):.1f}" y="{h - 10}" text-anchor="middle">{esc(lab)}</text>')
+        # The end labels are anchored inward, or they run off the viewBox and
+        # "shot 5" renders as "shot".
+        anchor = "start" if i == 0 and len(x_labels) > 1 else (
+            "end" if i == len(x_labels) - 1 and len(x_labels) > 1 else "middle")
+        x = X(i) - 2 if anchor == "start" else (X(i) + 2 if anchor == "end" else X(i))
+        out.append(f'<text class="tick" x="{x:.1f}" y="{h - 10}" '
+                   f'text-anchor="{anchor}">{esc(lab)}</text>')
     if pooled_mean is not None:
         out.append(f'<line class="mean" x1="{pad_l}" y1="{Y(pooled_mean):.1f}" '
                    f'x2="{w - pad_r}" y2="{Y(pooled_mean):.1f}"/>')

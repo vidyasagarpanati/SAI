@@ -104,9 +104,10 @@ footer{color:var(--muted);font-size:12px;text-align:center;margin-top:30px}
 </section>
 
 <section>
-  <h2>Phase duration, session by session</h2>
-  <p class="cap">One panel per phase. Each dot is one shot, the line joins the session
-  means, and the dashed line is the pooled mean across every shot here. A red dot with
+  <h2>Phase duration, {{ "shot by shot" if v.payload.within_one_session else "session by session" }}</h2>
+  <p class="cap">One panel per phase. Each dot is one shot, the line joins
+  {{ "the shots in order" if v.payload.within_one_session else "the session means" }},
+  and the dashed line is the pooled mean across every shot here. A red dot with
   a triangle above it is flagged: its duration sits more than
   {{ v.payload.sd_threshold }} standard deviations from the mean of <b>all the other
   shots</b>, computed without that shot, so an unusual shot cannot pull the line it is
@@ -116,7 +117,7 @@ footer{color:var(--muted);font-size:12px;text-align:center;margin-top:30px}
 </section>
 
 <section>
-  <h2>Shots outside the athlete's own range</h2>
+  <h2>Shots outside {{ "this session’s" if v.payload.within_one_session else "the athlete’s own" }} range</h2>
   {% if v.payload.deviations %}
   <table><tr><th>Shot</th><th>Phase</th><th>Duration</th><th>Baseline mean</th>
     <th>Baseline SD</th><th>n others</th><th>z</th><th></th><th>Boundary</th></tr>
