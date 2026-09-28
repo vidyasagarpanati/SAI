@@ -65,7 +65,7 @@ footer{color:var(--muted);font-size:12px;text-align:center;margin-top:30px}
 </head>
 <body>
 <header class="top">
-  <h1>Shot comparison across sessions</h1>
+  <h1>Shot comparison {{ "within one session" if v.payload.within_one_session else "across sessions" }}</h1>
   <div class="sub">{{ v.title }} &middot; {{ v.payload.totals.sessions }} sessions,
     {{ v.payload.totals.shots }} shots &middot; generated {{ v.generated }} &middot; {{ v.version_label }}</div>
 </header>
@@ -80,8 +80,10 @@ footer{color:var(--muted);font-size:12px;text-align:center;margin-top:30px}
     <td>{{ s.camera_view }}</td><td class="num">{{ s.n_shots }}</td>
     <td class="num">{{ "%.2f"|format(s.measured_fps) if s.measured_fps else "n/a" }}</td></tr>{% endfor %}
   </table>
-  <p class="cap">Sessions are shown in the order the runs were passed on the command line.
-  Nothing has been reordered.</p>
+  <p class="cap">{% if v.payload.within_one_session %}One session, so every shot in it is
+  compared against the others. Angles are comparable throughout, because one video is one
+  camera position.{% else %}Sessions are shown in the order the runs were passed on the
+  command line. Nothing has been reordered.{% endif %}</p>
 
   {% for w in v.payload.warnings %}<div class="warn">{{ w }}</div>{% endfor %}
   {% if v.payload.skipped_runs %}<div class="warn">Excluded:
@@ -130,6 +132,8 @@ footer{color:var(--muted);font-size:12px;text-align:center;margin-top:30px}
   boundary confidence means the phase edge itself was hard to place, so the deviation
   rests on a soft measurement and should be checked against the annotated video before
   it is acted on.</p>
+  {% elif not v.payload.flagging.possible %}
+  <div class="warn">{{ v.payload.flagging.reason }}</div>
   {% else %}
   <p class="na">No shot sits more than {{ v.payload.sd_threshold }} standard deviations from
   the others on any phase.{% if v.no_sd_phases %} Note that {{ v.no_sd_phases }} had too

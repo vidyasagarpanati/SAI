@@ -10,7 +10,8 @@
     archery run --video ... --from S8 --force  # redo the narrative
     archery status
     archery status <run_id>
-    archery compare --runs Kalapna__a8964b39 Kalapna__3f21c0de --out kalpana_6wk
+    archery compare --runs Kalapna__a8964b39                     # shots within one video
+    archery compare --runs Kalapna__a8964b39 Kalapna__3f21c0de   # across sessions
 """
 from __future__ import annotations
 
@@ -468,7 +469,9 @@ def cmd_compare(args) -> int:
         raise SystemExit(str(exc))
 
     print(f"runs   : {len(payload['sessions'])} read, "
-          f"{len(payload['skipped_runs'])} skipped")
+          f"{len(payload['skipped_runs'])} skipped"
+          + ("  (comparing shots within one session)"
+             if payload["within_one_session"] else ""))
     for s in payload["sessions"]:
         print(f"  {s['label']:<4} {s['run_id']:<28} {s['n_shots']} shot(s)  "
               f"{s['session_date'] or 'no date'}  {s['camera_view']}")
@@ -480,6 +483,8 @@ def cmd_compare(args) -> int:
 
     target, evidence = render(payload, cfg.paths.outputs_dir,
                               runs_dir / "_compare" / safe_label(label), label)
+    if not payload["flagging"]["possible"]:
+        print(f"\n[warn] {payload['flagging']['reason']}")
     print(f"\nflagged: {len(payload['deviations'])} shot-phase(s) beyond {args.sd} SD")
     for d in payload["deviations"][:6]:
         print(f"  {d['shot']:<12} {d['phase_name']:<22} {d['duration_s']:.3f}s  "
@@ -563,9 +568,10 @@ def build_parser() -> argparse.ArgumentParser:
     add_input_args(r, ask=False)
     r.set_defaults(func=cmd_run)
 
-    c = sub.add_parser("compare", help="Compare finished runs across sessions.")
+    c = sub.add_parser("compare", help="Compare shots within a run, or across runs.")
     c.add_argument("--runs", nargs="+", required=True, metavar="RUN_ID",
-                   help="Run ids, in the order they should appear on the time axis.")
+                   help="One run id compares that video's own shots. Several compare "
+                        "across sessions, in the order given.")
     c.add_argument("--out", help="Label for the output file. Defaults to the video stems.")
     c.add_argument("--sd", default=2.0, type=float,
                    help="How many leave-one-out standard deviations count as a "

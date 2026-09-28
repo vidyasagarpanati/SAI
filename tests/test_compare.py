@@ -58,6 +58,7 @@ def two_runs(tmp_path_factory):
 # 1 -----------------------------------------------------------------
 def test_identical_sessions_produce_identical_durations_and_no_flags(two_runs):
     p = build(two_runs, ["wk1__aaaa", "wk2__bbbb"], 2.0, 3)
+    assert p["axis_of"] == "session" and p["axis_labels"] == ["S1", "S2"]
     a = [s for s in p["shots"] if s["session_label"] == "S1"]
     b = [s for s in p["shots"] if s["session_label"] == "S2"]
     assert len(a) == len(b) == 3
@@ -111,7 +112,7 @@ def test_too_few_shots_withholds_the_sd_and_says_so(tmp_path):
 
 
 # 5 -----------------------------------------------------------------
-def test_a_different_camera_view_keeps_timings_and_drops_positions(tmp_path):
+def test_a_different_camera_view_keeps_timings_and_never_pools_angles(tmp_path):
     runs = tmp_path / "runs"
     io_guard.configure([runs])
     make_session_run(runs, "a__1")
@@ -121,10 +122,14 @@ def test_a_different_camera_view_keeps_timings_and_drops_positions(tmp_path):
     assert all(len(s["phases"]) for s in p["shots"])       # durations kept
     assert any("MIXED CAMERA VIEWS" in w for w in p["warnings"])
     angle = p["positions"]["elbow_draw_deg"]
-    assert angle["groups"] == {}                            # no view has two sessions
-    assert len(angle["not_comparable"]) == 2
-    # Anchor distance is scale-normalised, so it still travels.
+    # Each view is its own group. Two views never share a panel, because the
+    # same name means a different quantity in each.
+    assert len(angle["groups"]) == 2
+    for view, pts in angle["groups"].items():
+        assert len({x["view"] for x in pts}) == 1, view
+    # Anchor distance is scale-normalised, so it still travels between views.
     assert p["positions"]["anchor_distance_norm"]["view_free"] is True
+    assert len(p["positions"]["anchor_distance_norm"]["groups"]) == 1
 
 
 # 6 -----------------------------------------------------------------
@@ -165,16 +170,77 @@ def test_a_missing_run_is_named_and_the_rest_still_compare(tmp_path):
     assert [s["label"] for s in p["sessions"]] == ["S1", "S3"]
 
 
-def test_fewer_than_two_readable_runs_refuses(tmp_path):
+def test_nothing_readable_refuses_but_one_good_run_is_enough(tmp_path):
     runs = tmp_path / "runs"
     io_guard.configure([runs])
     make_session_run(runs, "a__1")
-    with pytest.raises(CompareError, match="Fewer than two"):
-        build(runs, ["a__1", "ghost__9"], 2.0, 3)
-    with pytest.raises(CompareError, match="at least two"):
-        build(runs, ["a__1"], 2.0, 3)
+    # A missing companion no longer sinks the comparison: the surviving run has
+    # three shots, which is a comparison in itself.
+    p = build(runs, ["a__1", "ghost__9"], 2.0, 3)
+    assert len(p["sessions"]) == 1 and p["totals"]["shots"] == 3
+    with pytest.raises(CompareError, match="No run could be read"):
+        build(runs, ["ghost__9"], 2.0, 3)
+    with pytest.raises(CompareError, match="at least one run"):
+        build(runs, [], 2.0, 3)
     with pytest.raises(CompareError, match="more than once"):
         build(runs, ["a__1", "a__1"], 2.0, 3)
+
+
+# ------------------------------------------------- one video is a comparison
+def test_a_single_run_compares_its_own_shots(tmp_path):
+    runs = tmp_path / "runs"
+    io_guard.configure([runs])
+    make_session_run(runs, "solo__1", stretch=(2, "AIM", 1.6))
+    p = build(runs, ["solo__1"], 2.0, 3)
+    assert p["within_one_session"] is True
+    assert p["axis_of"] == "shot"
+    assert p["axis_labels"] == ["shot 1", "shot 2", "shot 3"]
+    assert [s["xi"] for s in p["shots"]] == [0, 1, 2]
+    # Three shots cannot flag anything: judging one against the others leaves
+    # two, below the three-shot floor for an SD. The report says so rather than
+    # showing an empty table that reads as "all clear".
+    assert p["flagging"]["possible"] is False
+    assert p["flagging"]["needed_shots"] == 4
+    assert p["deviations"] == []
+    # Angles within one video share a camera, so they are comparable.
+    assert p["positions"]["elbow_draw_deg"]["groups"]
+    assert p["warnings"] == []          # ordering and mixing cannot apply
+
+
+def test_a_single_run_with_enough_shots_does_flag_its_odd_one(tmp_path):
+    runs = tmp_path / "runs"
+    io_guard.configure([runs])
+    make_session_run(runs, "solo__1", n_shots=5, stretch=(3, "AIM", 1.6))
+    p = build(runs, ["solo__1"], 2.0, 3)
+    assert p["flagging"]["possible"] is True
+    # The stretched shot is flagged. It is not necessarily the top row: the
+    # synthetic archer varies its draw across shots too, and that is the point
+    # of ranking the table rather than reporting one winner.
+    hits = {(d["shot"], d["phase"]): d for d in p["deviations"]}
+    aim = hits[("S1 shot 4", "AIM")]
+    assert aim["direction"] == "slower" and aim["z"] > 3
+    assert p["deviations"] == sorted(p["deviations"], key=lambda d: -abs(d["z"]))
+    assert p["axis_labels"] == [f"shot {i}" for i in range(1, 6)]
+
+
+def test_a_single_shot_has_nothing_to_compare_against(tmp_path):
+    runs = tmp_path / "runs"
+    io_guard.configure([runs])
+    make_session_run(runs, "one__1", n_shots=1)
+    with pytest.raises(CompareError, match="nothing to be compared against"):
+        build(runs, ["one__1"], 2.0, 3)
+
+
+def test_the_single_run_report_renders_and_says_it_is_within_one_session(tmp_path):
+    runs = tmp_path / "runs"
+    make_session_run(runs, "solo__1")
+    io_guard.configure([tmp_path])
+    p = build(runs, ["solo__1"], 2.0, 3)
+    target, _ = render(p, tmp_path / "outputs", tmp_path / "ev", "solo")
+    html = target.read_text(encoding="utf-8")
+    assert "within one session" in html
+    assert ">shot 1<" in html          # the axis is shots, not sessions
+    assert "<script" not in html
 
 
 # 9 -----------------------------------------------------------------

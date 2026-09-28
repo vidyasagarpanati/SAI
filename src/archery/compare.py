@@ -10,8 +10,10 @@ OUT    a comparison payload; compare_report.py renders it
 Three rules, each of which exists because breaking it would produce a chart
 that lies.
 
-1. THERE IS NO SHARED SHOT AXIS. A two-shot video and a three-shot video have
-   no shot 2 in common. Shots are pooled per phase; the shot index is a label.
+1. THE UNIT IS THE SHOT, NOT THE VIDEO. One run with several shots is a
+   complete comparison on its own; several runs just widen the pool. And a
+   two-shot video and a three-shot video have no shot 2 in common, so shots are
+   pooled per phase and the shot index is only a label.
 2. DURATIONS TRAVEL, ANGLES DO NOT. Phase durations are seconds and S0
    measures the true frame rate, so they compare across anything. Joint angles
    are image-plane projections, so they are only comparable inside a group of
@@ -66,6 +68,7 @@ class Shot:
     athlete: str
     shot: int
     label: str                       # "S1 shot 2"
+    xi: int = 0                      # column on the comparison axis
     phases: dict = field(default_factory=dict)      # code -> {duration_s, start, end, confidence}
     positions: dict = field(default_factory=dict)   # measure -> value at the AIM key frame
     total_s: float | None = None
@@ -211,16 +214,15 @@ def comparability(sessions: list[Session]) -> dict:
     """Which sessions may be compared on positions, and which may not.
 
     Durations are seconds and compare across everything. Angles are image-plane
-    projections, so a session filmed from a different view measures a different
-    quantity under the same name.
+    projections, so what decides comparability is the CAMERA VIEW, not how many
+    sessions there are: three shots from one video share a view exactly, and
+    two videos filmed from different positions never do.
     """
     groups: dict[str, list[str]] = {}
     for s in sessions:
         groups.setdefault(s.camera_view.strip().lower(), []).append(s.label)
-    usable = {view: labs for view, labs in groups.items() if len(labs) >= 2}
-    excluded = {view: labs for view, labs in groups.items() if len(labs) < 2}
     return {
-        "groups": groups, "usable": usable, "excluded": excluded,
+        "groups": groups,
         "single_view": len(groups) == 1,
         "fps": sorted({round(s.measured_fps, 2) for s in sessions
                        if s.measured_fps is not None}),
@@ -229,6 +231,9 @@ def comparability(sessions: list[Session]) -> dict:
 
 def warnings_for(sessions: list[Session]) -> list[str]:
     out = []
+    if len(sessions) == 1:
+        # Nothing about ordering, mixed athletes or mixed views can apply.
+        return out
     athletes = sorted({s.athlete for s in sessions})
     if len(athletes) > 1:
         out.append(
@@ -268,35 +273,39 @@ def warnings_for(sessions: list[Session]) -> list[str]:
 
 
 def position_series(shots: list[Shot], sessions: list[Session], comp: dict) -> dict:
-    """Per measure, the points that may honestly be drawn together."""
+    """Per measure, the points that may honestly be drawn together.
+
+    A group needs two or more SHOTS, not two or more sessions: within one video
+    every shot was filmed from the same position, so the angles are as
+    comparable as they ever get.
+    """
     by_label = {s.label: s for s in sessions}
     out: dict[str, dict] = {}
     for name in POSITION_MEASURES:
         points = [{"shot": s.label, "session": s.session_label, "athlete": s.athlete,
-                   "order": s.order, "value": s.positions[name]["value"],
+                   "order": s.order, "xi": s.xi, "value": s.positions[name]["value"],
                    "confidence": s.positions[name].get("confidence"),
                    "reason": s.positions[name].get("reason"),
                    "view": by_label[s.session_label].camera_view}
                   for s in shots if name in s.positions]
-        if not points:
+        if len(points) < 2:
             continue
         if name in VIEW_FREE:
-            out[name] = {"view_free": True,
-                         "groups": {"all sessions": points}}
+            out[name] = {"view_free": True, "groups": {"every session": points},
+                         "not_comparable": []}
             continue
         grouped: dict[str, list] = {}
         for p in points:
             grouped.setdefault(p["view"], []).append(p)
-        drawable = {view: pts for view, pts in grouped.items()
-                    if len({p["session"] for p in pts}) >= 2}
+        drawable = {view: pts for view, pts in grouped.items() if len(pts) >= 2}
         out[name] = {"view_free": False, "groups": drawable,
                      "not_comparable": sorted(set(grouped) - set(drawable))}
     return out
 
 
 def build(runs_dir: Path, run_ids: list[str], sd_k: float, min_for_sd: int) -> dict:
-    if len(run_ids) < 2:
-        raise CompareError("Give at least two runs to compare.")
+    if not run_ids:
+        raise CompareError("Give at least one run to compare.")
     if len(set(run_ids)) != len(run_ids):
         dupes = sorted({r for r in run_ids if run_ids.count(r) > 1})
         raise CompareError(f"The same run was passed more than once: {dupes}. "
@@ -312,17 +321,55 @@ def build(runs_dir: Path, run_ids: list[str], sd_k: float, min_for_sd: int) -> d
         sessions.append(session)
         shots.extend(run_shots)
 
-    if len(sessions) < 2:
+    if not sessions:
         raise CompareError(
-            "Fewer than two runs could be read, so there is nothing to compare.\n  "
+            "No run could be read, so there is nothing to compare.\n  "
             + "\n  ".join(f"{s['run_id']}: {s['reason']}" for s in skipped))
+    if len(shots) < 2:
+        raise CompareError(
+            f"Only one shot was found across {len(sessions)} run(s). A shot has "
+            f"nothing to be compared against. Give a run with more shots, or add "
+            f"another run.")
+
+    # With one session the interesting axis is the shot; with several it is the
+    # session, and shots from the same session share a column.
+    within = len(sessions) == 1
+    if within:
+        axis_labels = [f"shot {s.shot}" for s in shots]
+        for i, s in enumerate(shots):
+            s.xi = i
+    else:
+        order_of = {s.label: i for i, s in enumerate(sorted(sessions, key=lambda x: x.order))}
+        axis_labels = [s.label for s in sorted(sessions, key=lambda x: x.order)]
+        for s in shots:
+            s.xi = order_of[s.session_label]
 
     base = baselines(shots, min_for_sd)
     comp = comparability(sessions)
+
+    # Leave-one-out costs a shot. With the three-shot floor for an SD, four
+    # shots is the minimum at which anything can be flagged, and a report that
+    # showed an empty table without saying so would read as "all clear".
+    needed = min_for_sd + 1
+    flagging = {
+        "possible": len(shots) >= needed,
+        "needed_shots": needed,
+        "have_shots": len(shots),
+        "reason": None if len(shots) >= needed else (
+            f"{len(shots)} shots were analysed. Judging a shot against the others "
+            f"leaves {len(shots) - 1}, below the {min_for_sd}-shot floor this "
+            f"pipeline uses before it will report a standard deviation, so no shot "
+            f"can be flagged. {needed} shots is the minimum. The durations below "
+            f"are still shown and still comparable."),
+    }
     return {
+        "flagging": flagging,
         "schema_version": 1,
         "sd_threshold": sd_k,
         "min_shots_for_sd": min_for_sd,
+        "within_one_session": within,
+        "axis_labels": axis_labels,
+        "axis_of": "shot" if within else "session",
         "sessions": [vars(s) for s in sessions],
         "shots": [{**vars(s)} for s in shots],
         "phase_order": [c for c in ORDER if any(c in s.phases for s in shots)],

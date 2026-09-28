@@ -220,14 +220,14 @@ def _facet(title: str, subtitle: str, points: list[dict], flagged: set,
 
 
 def phase_facets(payload: dict) -> str:
+    """The x axis is whichever the comparison is actually about: shots when one
+    session was given, sessions when several were."""
     order = payload["phase_order"]
-    sessions = sorted(payload["sessions"], key=lambda s: s["order"])
-    x_labels = [s["label"] for s in sessions]
-    xi = {s["label"]: i for i, s in enumerate(sessions)}
+    x_labels = payload["axis_labels"]
     flagged = {(d["shot"], d["phase"]) for d in payload["deviations"]}
     parts = []
     for code in order:
-        points = [{"shot": s["label"], "xi": xi[s["session_label"]],
+        points = [{"shot": s["label"], "xi": s["xi"],
                    "value": s["phases"][code]["duration_s"]}
                   for s in payload["shots"]
                   if code in s["phases"] and s["phases"][code]["duration_s"] is not None]
@@ -245,24 +245,23 @@ def phase_facets(payload: dict) -> str:
 
 
 def position_facets(payload: dict) -> str:
-    sessions = sorted(payload["sessions"], key=lambda s: s["order"])
-    xi = {s["label"]: i for i, s in enumerate(sessions)}
+    all_labels = payload["axis_labels"]
     blocks = []
     for measure, spec in payload["positions"].items():
         for view, points in (spec.get("groups") or {}).items():
-            pts = [{"shot": p["shot"], "xi": xi[p["session"]], "value": p["value"]}
+            # Keep only the columns this group actually occupies, so a group
+            # confined to one session does not draw empty columns for the rest.
+            cols = sorted({p["xi"] for p in points})
+            remap = {c: i for i, c in enumerate(cols)}
+            pts = [{"shot": p["shot"], "xi": remap[p["xi"]], "value": p["value"]}
                    for p in points]
-            if len({p["xi"] for p in pts}) < 2:
-                continue
-            labels = [s["label"] for s in sessions
-                      if s["label"] in {p["session"] for p in points}]
-            idx = {lab: i for i, lab in enumerate(labels)}
-            pts = [{**p, "xi": idx[points[i]["session"]]} for i, p in enumerate(pts)]
+            labels = [all_labels[c] for c in cols]
             vals = [p["value"] for p in pts]
             mean = sum(vals) / len(vals)
             units = "SW" if measure.endswith("_norm") else "deg"
             sub = ("scale-normalised, comparable across views"
                    if spec.get("view_free") else f"view: {view}")
             blocks.append(_facet(payload["measure_names"].get(measure, measure),
-                                 f"{sub} &#183; n={len(pts)}", pts, set(), labels, mean, units))
+                                 f"{sub} &#183; n={len(pts)} shots", pts, set(),
+                                 labels, mean, units))
     return f'<div class="facets">{"".join(blocks)}</div>' if blocks else ""

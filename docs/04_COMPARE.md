@@ -26,7 +26,7 @@ matches. Anchor distance is normalised by shoulder width and does travel.
 | # | Decision | Chosen |
 |---|---|---|
 | C1 | Shape | A separate `archery compare` command, read-only over finished runs. Nothing in the per-video pipeline changes. |
-| C2 | Which runs | Exactly the run ids passed on the command line. No athlete resolution, no scanning. |
+| C2 | Which runs | Exactly the run ids passed on the command line. No athlete resolution, no scanning. **One run is enough**: its own shots are the comparison. Several runs widen the pool. |
 | C3 | Baseline | Leave-one-out: each shot is judged against the mean and SD of all the OTHER shots in the set, so a slow shot cannot inflate the baseline that judges it. |
 | C4 | Comparability | Durations plotted across everything. Position charts only within a camera-view group, with the excluded sessions named. |
 | C5 | Mixed athletes | Allowed, warned, and every series labelled by athlete. The report states that the baseline is then not one athlete's own history. |
@@ -44,9 +44,19 @@ nothing: the order asked for is the order drawn.
 ## Inputs and outputs
 
 ```
-archery compare --runs Kalapna__a8964b39 Kalapna__3f21c0de --out kalpana_6wk
+archery compare --runs Kalapna__a8964b39                      # shots within one video
+archery compare --runs Kalapna__a8964b39 Kalapna__3f21c0de    # across two sessions
 archery compare --runs <id> <id> <id> --sd 2.0
 ```
+
+With one run the x axis is the shot; with several it is the session and shots
+from one session share a column. Angles are comparable throughout a single
+video, because one video is one camera position.
+
+**Leave-one-out costs a shot.** Judging a shot against the others leaves n-1,
+and `stats.min_shots_for_sd` is 3, so **four shots is the minimum at which
+anything can be flagged**. Below that the report says so in place of the
+deviation table, because an empty table reads as "all clear".
 
 Reads `runs/<id>/05_metrics.json` and nothing else. Never opens a video, never
 writes inside a run directory. 05_metrics.json is already the single frozen
@@ -89,8 +99,8 @@ Writes:
 
 1. Two runs of the same video produce identical durations and an empty
    deviation table.
-2. A synthetic set where one shot's AIM phase is stretched by 50% flags exactly
-   that shot, and no other.
+2. A set where one shot's AIM phase is stretched flags that shot. A single run
+   with three shots flags nothing and states why; with five, it flags.
 3. Leave-one-out really is leave-one-out: the flagged shot's own duration is
    absent from the baseline it is compared against.
 4. A two-shot set draws no SD band and says why.
