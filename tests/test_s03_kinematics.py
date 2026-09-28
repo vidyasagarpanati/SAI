@@ -310,3 +310,92 @@ def test_quality_records_the_distribution_so_bounds_can_be_re_derived(ctx, resul
     assert "neck_inclination_deg" in pct and "elbow_draw_deg" in pct
     p1, p50, p99 = pct["elbow_draw_deg"]
     assert p1 <= p50 <= p99
+
+
+# ------------------------------------------------- filter ringing at a hard limit
+# A run failed on ONE frame in 7765 where the draw elbow read -0.8 deg. arccos
+# cannot return a negative, so that was the smoothing filter ringing past zero
+# on a nearly folded elbow, and the check killed a thirty-minute run over it.
+
+def test_the_smoothing_filter_does_ring_past_zero_on_its_own():
+    """The reason the clip exists. Without it, a series pinned near zero comes
+    back negative, and a negative interior angle is not a measurement."""
+    from archery.geometry import smooth_nan
+    series = np.concatenate([np.full(12, 40.0), np.full(12, 0.3)])
+    assert smooth_nan(series, 9, 2).min() < 0.0
+
+
+def test_no_interior_angle_ever_leaves_its_defined_range(ctx, result):
+    import pandas as pd
+    k = pd.read_parquet(ctx.run_dir / "03_kinematics.parquet")
+    interior = [c for c in k.columns
+                if (c.endswith("_deg") or c.endswith("_deg_3d"))
+                and not c.endswith(("_tilt_deg", "_inclination_deg", "_separation_deg"))]
+    assert len(interior) >= 28
+    for c in interior:
+        v = k[c].to_numpy(dtype=float)
+        v = v[np.isfinite(v)]
+        assert v.size and v.min() >= 0.0 and v.max() <= 180.0, (c, v.min(), v.max())
+
+
+def test_a_folded_elbow_survives_smoothing_without_going_negative(ctx, tmp_path):
+    """Drive the draw elbow to a hard fold, which is where the filter rings."""
+    import pandas as pd
+    from archery.config import load_config
+    from archery.landmarks import ID
+    from archery.steps import s03_kinematics as s3
+
+    run = tmp_path / "folded"
+    run.mkdir(parents=True)
+    io_guard.configure([run])
+    df = pd.read_parquet(ctx.run_dir / "02_landmarks.parquet").copy()
+    n = int(df["frame"].max()) + 1
+    idx = np.arange(len(df)).reshape(n, 33)
+    # Put the draw wrist back on its own shoulder: the elbow folds shut.
+    for axis in ("x", "y"):
+        df.loc[idx[100:200, ID["RIGHT_WRIST"]], axis] = \
+            df.loc[idx[100:200, ID["RIGHT_SHOULDER"]], axis].to_numpy()
+    df.to_parquet(run / "02_landmarks.parquet", index=False)
+    (run / "01_frames.json").write_text(json.dumps(
+        {"frames_dir": str(run), "n_frames": n, "analysis_fps": 60.0,
+         "frame_width": 1920, "frame_height": 1080}))
+    (run / "02_pose_quality.json").write_text(json.dumps({"detection_rate": 1.0}))
+    c = Context(cfg=load_config(ROOT), run_id="folded", run_dir=run,
+                video_path=Path("x.mov"), session={"draw_hand": "right"})
+    res = s3.run(c)
+
+    k = pd.read_parquet(run / "03_kinematics.parquet")
+    v = k["elbow_draw_deg"].to_numpy(dtype=float)
+    v = v[np.isfinite(v)]
+    assert v.min() >= 0.0, v.min()
+    assert v.min() < 5.0                      # it really did reach the fold
+    assert "elbow_draw_deg" not in json.loads(
+        (run / "03_quality.json").read_text())["implausible_values"]
+    assert res.passed
+
+
+def test_one_stray_frame_in_a_core_measure_does_not_fail_the_run(ctx, tmp_path, monkeypatch):
+    import pandas as pd
+    from archery.config import load_config
+    from archery.steps import s03_kinematics as s3
+
+    run = tmp_path / "onestray"
+    run.mkdir(parents=True)
+    io_guard.configure([run])
+    pd.read_parquet(ctx.run_dir / "02_landmarks.parquet").to_parquet(
+        run / "02_landmarks.parquet", index=False)
+    (run / "01_frames.json").write_text(json.dumps(
+        {"frames_dir": str(run), "n_frames": 300, "analysis_fps": 60.0,
+         "frame_width": 1000, "frame_height": 1000}))
+    (run / "02_pose_quality.json").write_text(json.dumps({"detection_rate": 1.0}))
+    # A bound just under the observed maximum clips a handful of frames only.
+    c = Context(cfg=load_config(ROOT), run_id="onestray", run_dir=run,
+                video_path=Path("x.mov"), session={"draw_hand": "right"})
+    baseline = s3.run(c)
+    k = pd.read_parquet(run / "03_kinematics.parquet")["elbow_bow_deg"]
+    cut = float(np.nanpercentile(k.to_numpy(dtype=float), 99.8))
+    monkeypatch.setitem(s3.PLAUSIBLE, "elbow", (0.0, cut))
+    res = s3.run(c)
+    assert baseline.passed and res.passed
+    warn = [x for x in res.checks if x.name == "implausible_frames_discarded"][0]
+    assert not warn.ok and warn.severity == "WARN"
