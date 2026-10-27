@@ -1,6 +1,6 @@
 # 05 - Local web UI (`archery serve`)
 
-Status: SPEC. No code written.
+Status: BUILT. All five phases ship. `archery serve`.
 
 ## What it is
 
@@ -132,3 +132,55 @@ contains no write path of its own.
 
 `fastapi` and `uvicorn`, pinned. Nothing else: the templates, the charts and
 the reports are all already in the repo.
+
+
+## Part 2 - What shipped
+
+| File | What it does |
+|---|---|
+| `src/archery/web/library.py` | Reads `runs/*/state.json` into rows, and resolves a run id to the files it produced. All path safety lives here, in one place. |
+| `src/archery/web/jobs.py` | Single-worker FIFO queue. Each job is a subprocess of the CLI. |
+| `src/archery/web/app.py` | The routes. Serves and starts; computes nothing. |
+| `templates/web/*.html.j2` | Eight pages in the same visual language as the reports. |
+| `src/archery/cli.py` | `archery serve`, and `doctor_rows` split out of `cmd_doctor` so the CLI and the page cannot disagree about what is wrong. |
+| `tests/test_web.py` | 27 tests against real run directories. |
+
+```
+archery serve --videos "D:\Archery-InputData" --open
+```
+
+### Things worth knowing
+
+- **A run is DONE when S10 is DONE**, not when every step ran. S7 is skippable
+  and a skipped annotated video does not make a finished run unfinished.
+- **The recorded path is not a permission.** Even a path the pipeline itself
+  wrote into `state.json` is refused unless it resolves inside `runs/` or
+  `outputs/`. A test moves a recorded report outside those roots and asserts
+  the server stops serving it.
+- **The same video cannot be queued twice**, because both runs would write into
+  one run directory and fight over `state.json`.
+- **Cancel leaves the run resumable.** Every finished step keeps its cached
+  output, so starting again picks up where it stopped.
+- **The form and the CLI share a parser.** `Height: 170 cms` means the same
+  thing in both, and an out-of-range value is refused with the line quoted.
+- Session files land in `sessions/<video>.json`, so any run started from the
+  browser can be repeated from the command line.
+
+### Verification, all passing (154 tests, 27 new)
+
+Run ids that are not directory names are refused, including `..`, separators,
+percent-encoded traversal and the empty string. Artefact and frame routes
+refuse traversal. A recorded path outside the served roots is not served. The
+library parses a real `state.json`, including a run that failed at S3, and the
+failing check reaches the page with its detail. The web package contains no
+write path of its own except the one session write, which goes through
+`io_guard`. Queueing the same video twice is refused, several videos run in
+order, cancelling a queued job removes it. The form rejects what the CLI
+rejects. Compare is reachable from the library and its refusals are shown
+rather than swallowed. `cmd_serve` binds 127.0.0.1 and contains no `0.0.0.0`.
+
+### Not built, deliberately
+
+No authentication, because nothing is exposed. No upload: the folder picker
+means a 500MB file is never copied. No re-rendering of reports: the pages
+serve the files the pipeline already made.

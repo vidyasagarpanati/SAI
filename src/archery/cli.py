@@ -10,6 +10,7 @@
     archery run --video ... --from S8 --force  # redo the narrative
     archery status
     archery status <run_id>
+    archery serve --videos "D:\\Archery-InputData" --open       # the local web UI
     archery compare --runs Kalapna__a8964b39                     # shots within one video
     archery compare --runs Kalapna__a8964b39 Kalapna__3f21c0de   # across sessions
 """
@@ -230,10 +231,16 @@ def cmd_init_session(args) -> int:
     return 0
 
 
-def cmd_doctor(args) -> int:
+DOCTOR_NON_BLOCKING = ("ffprobe", "ollama", "llm.model", "model vision",
+                       "pyarrow+mediapipe")
+
+
+def doctor_rows(cfg, with_llm: bool = False) -> list[tuple[str, bool, str]]:
+    """Environment checks as data. The CLI prints them; the web page renders
+    them. One definition, so the two can never disagree about what is wrong."""
     import shutil
-    cfg = _bootstrap(args.root)
     rows: list[tuple[str, bool, str]] = []
+
 
     rows.append(("python", sys.version_info[:2] >= (3, 11) and sys.version_info[:2] < (3, 13),
                  f"{sys.version.split()[0]} (need 3.11 or 3.12 for mediapipe wheels)"))
@@ -323,7 +330,7 @@ def cmd_doctor(args) -> int:
     except Exception as exc:  # noqa: BLE001
         rows.append(("ollama", False, f"{base} unreachable: {exc}"))
 
-    if getattr(args, "llm", False):
+    if with_llm:
         # One tiny structured-output call through the same client S8 uses.
         from archery.llm import OllamaClient
         try:
@@ -363,6 +370,12 @@ def cmd_doctor(args) -> int:
         except Exception as exc:  # noqa: BLE001
             rows.append(("structured output", False, f"{type(exc).__name__}: {exc}"))
 
+    return rows
+
+
+def cmd_doctor(args) -> int:
+    cfg = _bootstrap(args.root)
+    rows = doctor_rows(cfg, with_llm=bool(args.llm))
     width = max(len(name) for name, _, _ in rows)
     for name, ok, detail in rows:
         print(f"[{'ok ' if ok else 'XX '}] {name:<{width}}  {detail}")
@@ -498,6 +511,34 @@ def safe_label(text: str) -> str:
     return safe(text)
 
 
+def cmd_serve(args) -> int:
+    """The local UI. Bound to 127.0.0.1 and nothing else: there is no
+    authentication because nothing is exposed, and that is only true while the
+    bind address stays loopback."""
+    import uvicorn
+
+    from archery.web import create_app
+
+    cfg = _bootstrap(args.root)
+    videos = Path(args.videos).expanduser() if args.videos else None
+    if videos and not videos.is_dir():
+        raise SystemExit(f"--videos is not a folder: {videos}")
+
+    app = create_app(cfg.root, videos)
+    url = f"http://127.0.0.1:{args.port}"
+    print(f"SAI archery UI  {url}")
+    print(f"  runs    : {cfg.paths.runs_dir}")
+    print(f"  outputs : {cfg.paths.outputs_dir}")
+    print(f"  videos  : {videos or 'none (pass --videos to enable new runs)'}")
+    print("  bound to 127.0.0.1 only; nothing is reachable from the network.\n")
+    if args.open:
+        import threading
+        import webbrowser
+        threading.Timer(1.0, lambda: webbrowser.open(url)).start()
+    uvicorn.run(app, host="127.0.0.1", port=int(args.port), log_level="warning")
+    return 0
+
+
 def cmd_status(args) -> int:
     cfg = _bootstrap(args.root)
     runs_dir = cfg.paths.runs_dir
@@ -577,6 +618,12 @@ def build_parser() -> argparse.ArgumentParser:
                    help="How many leave-one-out standard deviations count as a "
                         "deviation. Default 2.")
     c.set_defaults(func=cmd_compare)
+
+    w = sub.add_parser("serve", help="Open the local web UI.")
+    w.add_argument("--port", default=8000, type=int)
+    w.add_argument("--videos", help="Folder the new-run page offers videos from.")
+    w.add_argument("--open", action="store_true", help="Open a browser once it is up.")
+    w.set_defaults(func=cmd_serve)
 
     s = sub.add_parser("status", help="Show the state of a run.")
     s.add_argument("run_id", nargs="?")

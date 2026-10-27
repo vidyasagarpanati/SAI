@@ -1,0 +1,10 @@
+{% extends "base.html.j2" %}{% set nav = "library" %}
+{% block title %}Comparison refused{% endblock %}
+{% block body %}
+<section>
+  <h2>The comparison was refused</h2>
+  <div class="banner bad" style="white-space:pre-wrap">{{ message }}</div>
+  <p class="muted">Runs asked for: {{ ids|join(", ") }}</p>
+  <p><a class="btn ghost" href="/">Back to runs</a></p>
+</section>
+{% endblock %}

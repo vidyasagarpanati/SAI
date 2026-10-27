@@ -1,0 +1,18 @@
+{% extends "base.html.j2" %}{% set nav = "jobs" %}
+{% block title %}Started - SAI Archery{% endblock %}
+{% block body %}
+<section>
+  <h2>What the form understood</h2>
+  <table>{% for label, value in echo %}<tr><td style="width:220px">{{ label }}</td>
+    <td{% if value == "NOT PROVIDED" %} class="na"{% endif %}>{{ value }}</td></tr>{% endfor %}</table>
+  <p class="muted">Every absent field is named rather than defaulted, because a silent default
+  is how a wrong number reaches a report.</p>
+</section>
+<section>
+  <h2>Queued</h2>
+  {% if started %}<div class="banner good">{{ started|length }} analysis queued. They run one
+    after another.</div>{% endif %}
+  {% for r in refused %}<div class="banner bad">{{ r }}</div>{% endfor %}
+  <p><a class="btn" href="/jobs">Watch the queue</a> <a class="btn ghost" href="/">Runs</a></p>
+</section>
+{% endblock %}

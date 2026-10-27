@@ -1,0 +1,109 @@
+{% extends "base.html.j2" %}{% set nav = "library" %}
+{% block title %}{{ run.athlete }} - {{ run.run_id }}{% endblock %}
+{% block body %}
+<section>
+  <h2>{{ run.athlete }} <span class="chip s-{{ run.status }}" id="run-status">{{ run.status }}</span>
+    {% if run.partial %}<span class="chip s-QUEUED">PARTIAL REPORT</span>{% endif %}</h2>
+  <div class="grid">
+    <div><div class="muted">Run</div>{{ run.run_id }}</div>
+    <div><div class="muted">Video</div>{{ run.video_name }}</div>
+    <div><div class="muted">Session date</div>{{ run.session_date or "not set" }}</div>
+    <div><div class="muted">Shots detected</div>{{ run.n_shots if run.n_shots is not none else "-" }}</div>
+    <div><div class="muted">Total compute</div><span id="run-total">{{ run.total }}</span></div>
+  </div>
+  <p style="margin-top:14px">
+    {% if run.report %}<a class="btn" href="/artefact/report/{{ run.run_id }}" target="_blank">Open report</a>{% endif %}
+    {% if run.video %}<a class="btn ghost" href="/artefact/video/{{ run.run_id }}" target="_blank">Annotated video</a>{% endif %}
+    {% if run.evidence %}<a class="btn ghost" href="/artefact/evidence/{{ run.run_id }}?download=1">Evidence file</a>{% endif %}
+    {% if job and job.status in ("QUEUED", "RUNNING") %}
+      <button class="btn warn" onclick="cancelJob('{{ job.id }}')">Cancel</button>{% endif %}
+    <a class="btn ghost" href="/">Back to runs</a>
+  </p>
+  {% if run.partial %}<div class="banner">This report is PARTIAL. The sections whose steps
+  failed are marked NOT AVAILABLE in it rather than being filled with guesses.</div>{% endif %}
+</section>
+
+{% if run.video %}
+<section>
+  <h2>Annotated video</h2>
+  <video controls preload="metadata" style="width:100%;border-radius:8px;border:1px solid var(--line)"
+         src="/artefact/video/{{ run.run_id }}"></video>
+  <p class="muted">Angles drawn on the frames are image-plane measurements, so they can be
+  checked against the pixels around them. A joint marked <b>!</b> is not square to the camera.</p>
+</section>
+{% endif %}
+
+<section>
+  <h2>Steps</h2>
+  <table id="steps">
+    <tr><th>Step</th><th>Name</th><th>Status</th><th>Checks</th><th>Took</th><th>Notes</th></tr>
+    {% for s in run.steps %}
+    <tr data-step="{{ s.step }}">
+      <td>{{ s.step }}</td><td>{{ s.name }}</td>
+      <td class="c-status"><span class="chip s-{{ s.status }}">{{ s.status }}</span></td>
+      <td class="c-checks num">{{ (s.checks_ok ~ "/" ~ s.checks_total) if s.checks_total else "-" }}</td>
+      <td class="c-took num">{{ s.took }}</td>
+      <td>
+        {% for c in s.failures %}<div><span class="chip s-FAILED">FAIL</span> <b>{{ c.name }}</b>: {{ c.detail }}</div>{% endfor %}
+        {% for c in s.warnings %}<div><span class="chip s-QUEUED">WARN</span> <b>{{ c.name }}</b>: {{ c.detail }}</div>{% endfor %}
+        {% if s.error %}<div class="muted">{{ s.error|truncate(400) }}</div>{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+</section>
+
+{% if job %}
+<section>
+  <h2>Log</h2>
+  <pre class="log" id="log">{{ job.log|join("\n") }}</pre>
+</section>
+{% endif %}
+
+{% if frames %}
+<section>
+  <h2>Key frames</h2>
+  <div class="frames">
+    {% for f in frames %}<figure style="margin:0"><img loading="lazy" src="/frame/{{ run.run_id }}/{{ f }}" alt="{{ f }}">
+      <figcaption class="muted">{{ f }}</figcaption></figure>{% endfor %}
+  </div>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block script %}
+<script>
+const RUN = {{ run.run_id|tojson }};
+async function cancelJob(id){
+  if(!confirm("Stop this analysis? Finished steps keep their cached output, so it can be resumed.")) return;
+  const r = await fetch(`/jobs/${id}/cancel`, {method:"POST"});
+  const j = await r.json(); alert(j.detail || "cancelled"); location.reload();
+}
+{% if run.status in ("RUNNING", "PENDING") or (job and job.status in ("QUEUED","RUNNING")) %}
+let misses = 0;
+async function poll(){
+  try{
+    const r = await fetch(`/api/run/${RUN}`);
+    if(!r.ok) throw new Error(r.status);
+    const d = await r.json(); misses = 0;
+    document.getElementById("run-status").textContent = d.status;
+    document.getElementById("run-status").className = "chip s-" + d.status;
+    document.getElementById("run-total").textContent = d.total;
+    for(const s of d.steps){
+      const row = document.querySelector(`tr[data-step="${s.step}"]`);
+      if(!row) continue;
+      row.querySelector(".c-status").innerHTML = `<span class="chip s-${s.status}">${s.status}</span>`;
+      row.querySelector(".c-checks").textContent = s.checks;
+      row.querySelector(".c-took").textContent = s.took;
+    }
+    const log = document.getElementById("log");
+    if(log && d.job && d.job.log){ log.textContent = d.job.log.join("\n"); log.scrollTop = log.scrollHeight; }
+    // A finished run gains a report and a video, which this page has not rendered yet.
+    if(d.status === "DONE" || d.status === "FAILED"){ setTimeout(() => location.reload(), 1200); return; }
+  }catch(e){ if(++misses > 10) return; }
+  setTimeout(poll, 2000);
+}
+poll();
+{% endif %}
+</script>
+{% endblock %}

@@ -1,0 +1,65 @@
+{% extends "base.html.j2" %}{% set nav = "library" %}
+{% block title %}Runs - SAI Archery{% endblock %}
+{% block body %}
+<section>
+  <h2>Runs</h2>
+  {% if active_jobs %}<div class="banner">{{ active_jobs|length }} analysis in progress.
+    <a href="/jobs">Watch the queue</a>.</div>{% endif %}
+  <form method="get" style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:10px">
+    <div><label class="f" for="athlete">Athlete</label>
+      <select name="athlete" id="athlete" style="min-width:180px"><option value="">All</option>
+      {% for a in athletes %}<option value="{{ a }}" {{ 'selected' if a == athlete }}>{{ a }}</option>{% endfor %}</select></div>
+    <div><label class="f" for="status">Status</label>
+      <select name="status" id="status" style="min-width:140px"><option value="">All</option>
+      {% for s in statuses %}<option value="{{ s }}" {{ 'selected' if s == status }}>{{ s }}</option>{% endfor %}</select></div>
+    <div><label class="f" for="group">Group</label>
+      <select name="group" id="group" style="min-width:150px">
+        <option value="">Newest first</option>
+        <option value="date" {{ 'selected' if group == 'date' }}>By session date</option></select></div>
+    <button class="btn ghost sm" type="submit">Apply</button>
+    {% if athlete or status %}<a class="btn ghost sm" href="/">Clear</a>{% endif %}
+    <span class="muted">{{ runs|length }} of {{ total }}</span>
+  </form>
+
+  {% if runs %}
+  <form method="post" action="/compare">
+  <table>
+    <tr><th style="width:34px"></th><th>Athlete</th><th>Video</th><th>Session date</th>
+      <th>Shots</th><th>Status</th><th>Steps</th><th>Time</th><th>Open</th></tr>
+    {% for date, bucket in (groups if groups else [(none, runs)]) %}
+    {% if date %}<tr><td colspan="9" style="background:var(--chip);font-weight:600">{{ date }}
+      <span class="muted">({{ bucket|length }} run{{ "s" if bucket|length != 1 }})</span></td></tr>{% endif %}
+    {% for r in bucket %}
+    <tr>
+      <td><input type="checkbox" name="runs_selected" value="{{ r.run_id }}" aria-label="Compare {{ r.run_id }}"></td>
+      <td><a href="/run/{{ r.run_id }}">{{ r.athlete }}</a><div class="muted">{{ r.run_id }}</div></td>
+      <td>{{ r.video_name }}</td>
+      <td>{{ r.session_date or '<span class="na">not set</span>'|safe }}</td>
+      <td class="num">{{ r.n_shots if r.n_shots is not none else "-" }}</td>
+      <td><span class="chip s-{{ r.status }}">{{ r.status }}</span>
+          {% if r.partial %}<span class="chip s-QUEUED">PARTIAL</span>{% endif %}
+          {% if r.status == "RUNNING" %}<div class="muted">{{ r.current_step }}</div>{% endif %}</td>
+      <td><span class="dots">{% for s in r.steps %}<i class="dot {{ s.status }}" title="{{ s.step }} {{ s.name }}: {{ s.status }}"></i>{% endfor %}</span>
+          <div class="muted">{{ r.done_steps }}/{{ r.steps|length }}</div></td>
+      <td class="num">{{ r.total }}</td>
+      <td>
+        {% if r.report %}<a class="btn sm" href="/artefact/report/{{ r.run_id }}" target="_blank">Report</a>{% endif %}
+        {% if r.video %}<a class="btn sm ghost" href="/artefact/video/{{ r.run_id }}" target="_blank">Video</a>{% endif %}
+        {% if not r.report and not r.video %}<span class="na">nothing yet</span>{% endif %}
+      </td>
+    </tr>
+    {% endfor %}{% endfor %}
+  </table>
+  <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">
+    <div><label class="f" for="sd">Deviation threshold (SD)</label>
+      <input type="number" step="0.5" min="0.5" max="6" name="sd" id="sd" value="2.0" style="width:110px"></div>
+    <button class="btn" type="submit">Compare ticked runs</button>
+    <span class="muted">One run compares its own shots. Several pool them, in the order they appear here.</span>
+  </div>
+  </form>
+  {% else %}
+  <p class="na">No runs yet{% if athlete or status %} matching that filter{% endif %}.
+    <a href="/new">Analyse a video</a> to make one.</p>
+  {% endif %}
+</section>
+{% endblock %}

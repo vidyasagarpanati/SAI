@@ -1,0 +1,89 @@
+{% extends "base.html.j2" %}{% set nav = "new" %}
+{% block title %}Analyse a video - SAI Archery{% endblock %}
+{% block body %}
+<form method="post" action="/new">
+<section>
+  <h2>Videos</h2>
+  {% if error %}<div class="banner bad" style="white-space:pre-wrap">{{ error }}</div>{% endif %}
+  {% if videos %}
+  <p class="muted">From {{ video_folder }}. Tick several and they run one after another.
+  The source file is never copied, moved or opened for writing.</p>
+  <div class="pick">
+    {% for v in videos %}
+    <label><input type="checkbox" name="videos" value="{{ v.path }}"> <b>{{ v.name }}</b>
+      <span class="muted">{{ v.mb }} MB</span></label>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="banner bad">No videos found{% if video_folder %} in {{ video_folder }}{% endif %}.
+    Start the server with <code>archery serve --videos "D:\Archery-InputData"</code>.</div>
+  {% endif %}
+</section>
+
+<section>
+  <h2>Session</h2>
+  <p class="muted">These apply to every video ticked above. Written to
+  <code>sessions/&lt;video&gt;.json</code>, so the same run can be repeated from the command line.</p>
+  <div class="grid">
+    <div><label class="f" for="athlete_name">Athlete name</label>
+      <input type="text" id="athlete_name" name="athlete_name" required></div>
+    <div><label class="f" for="bow_type">Bow type</label>
+      <select id="bow_type" name="bow_type">
+      {% for b in schema.properties.bow_type.enum %}<option {{ 'selected' if b == 'Recurve' }}>{{ b }}</option>{% endfor %}</select></div>
+    <div><label class="f" for="draw_hand">Draw hand</label>
+      <select id="draw_hand" name="draw_hand">
+      {% for h in schema.properties.draw_hand.enum %}<option>{{ h }}</option>{% endfor %}</select></div>
+    <div><label class="f" for="camera_view">Camera view</label>
+      <input type="text" id="camera_view" name="camera_view" value="side-on (bow-arm side)"></div>
+    <div><label class="f" for="session_date">Session date</label>
+      <input type="date" id="session_date" name="session_date"></div>
+    <div><label class="f" for="gender">Gender</label>
+      <select id="gender" name="gender"><option value=""></option>
+      {% for g in schema.properties.gender.enum if g %}<option>{{ g }}</option>{% endfor %}</select></div>
+    <div><label class="f" for="discipline">Discipline</label>
+      <input type="text" id="discipline" name="discipline" placeholder="Olympic Recurve"></div>
+    <div><label class="f" for="camera_distance_m">Camera distance (m)</label>
+      <input type="number" step="0.1" min="0.1" id="camera_distance_m" name="camera_distance_m"></div>
+    <div><label class="f" for="declared_frame_rate">Declared frame rate</label>
+      <input type="number" step="1" id="declared_frame_rate" name="declared_frame_rate"
+             placeholder="measured anyway"></div>
+    <div><label class="f" for="number_of_shots_expected">Shots expected</label>
+      <input type="number" step="1" min="1" id="number_of_shots_expected" name="number_of_shots_expected"></div>
+  </div>
+  <label class="f" for="notes">Notes</label>
+  <input type="text" id="notes" name="notes">
+  <p class="muted">Session date is optional, but <b>compare</b> uses it to warn when the order
+  of runs disagrees with the real chronology. Worth a second now.</p>
+</section>
+
+<section>
+  <h2>Athlete and physiological inputs</h2>
+  <label class="f" for="profile">Free text, one field per line</label>
+  <textarea id="profile" name="profile" spellcheck="false"
+placeholder="Height: 170 cms
+Weight: 60 kgs
+Age: 16 years
+Resting HR: 60 bpm
+Average HR: 80 bpm"></textarea>
+  <p class="muted">Parsed by the same code the command line uses, so the two cannot disagree
+  about what a line means. A value outside its plausible range is refused with the line
+  quoted, never clamped. A line nothing matches is kept as a note and never becomes evidence.</p>
+
+  <div class="grid">
+    <div><label class="f" for="force_plate">Force-plate export</label>
+      <select id="force_plate" name="force_plate"><option value="">none</option>
+      {% for f in plate_files %}<option value="{{ f.path }}">{{ f.name }}</option>{% endfor %}</select></div>
+  </div>
+  {% if not plate_files %}<p class="muted">No .csv or .xlsx found in the watched folder.
+  Put the posturography export there to attach one.</p>{% endif %}
+  <p class="muted">Rows are selected by athlete name, so the name above must match the
+  export's <code>Subject - Name</code>. A name matching none or several is refused with the
+  candidates listed, rather than quietly reporting another athlete's posture.</p>
+</section>
+
+<section>
+  <button class="btn" type="submit">Start analysis</button>
+  <span class="muted">About 22 minutes per video on this machine. Narration is roughly 15 of them.</span>
+</section>
+</form>
+{% endblock %}

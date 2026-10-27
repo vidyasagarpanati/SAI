@@ -1,0 +1,28 @@
+{% extends "base.html.j2" %}{% set nav = "doctor" %}
+{% block title %}Environment - SAI Archery{% endblock %}
+{% block body %}
+<section>
+  <h2>Environment</h2>
+  {% if blocking %}
+  <div class="banner bad"><b>Blocking:</b> {{ blocking|join(", ") }}.
+    The deterministic steps will not run until these are fixed.</div>
+  {% else %}
+  <div class="banner good">Ready for the deterministic steps, S0 to S7.</div>
+  {% endif %}
+  <table>
+    <tr><th style="width:200px">Check</th><th style="width:70px">Result</th><th>Detail</th></tr>
+    {% for name, ok, detail in rows %}
+    <tr><td>{{ name }}</td>
+      <td><span class="chip s-{{ 'DONE' if ok else 'FAILED' }}">{{ "ok" if ok else "FAIL" }}</span></td>
+      <td style="word-break:break-word">{{ detail }}</td></tr>
+    {% endfor %}
+  </table>
+  <p>
+    {% if llm %}<a class="btn ghost" href="/doctor">Without the language-model probe</a>
+    {% else %}<a class="btn" href="/doctor?llm=1">Also probe the language model</a>{% endif %}
+  </p>
+  <p class="muted">Narration is the longest step in a run, roughly fifteen of the twenty-two
+  minutes, and it needs Ollama up with the configured model pulled. Check that before a demo,
+  not during one.</p>
+</section>
+{% endblock %}

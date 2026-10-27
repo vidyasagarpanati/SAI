@@ -1,0 +1,47 @@
+{% extends "base.html.j2" %}{% set nav = "jobs" %}
+{% block title %}Queue - SAI Archery{% endblock %}
+{% block body %}
+<section>
+  <h2>Queue</h2>
+  <p class="muted">One analysis at a time. The pipeline is CPU-bound, and two runs of the same
+  video would write into the same run directory.</p>
+  {% if jobs %}
+  <table id="jobs">
+    <tr><th>Video</th><th>Status</th><th>Run</th><th>Elapsed</th><th>Last line</th><th></th></tr>
+    {% for j in jobs %}
+    <tr data-job="{{ j.id }}">
+      <td>{{ j.video.name }}</td>
+      <td class="c-status"><span class="chip s-{{ j.status }}">{{ j.status }}</span></td>
+      <td>{% if j.run_id %}<a href="/run/{{ j.run_id }}">{{ j.run_id }}</a>{% else %}<span class="na">not started</span>{% endif %}</td>
+      <td class="c-elapsed num">{{ "%.0f"|format(j.elapsed_s) }}s</td>
+      <td class="c-last muted" style="max-width:420px;word-break:break-word">{{ (j.log|list)[-1] if j.log else "" }}</td>
+      <td>{% if j.status in ("QUEUED","RUNNING") %}<button class="btn warn sm" onclick="cancelJob('{{ j.id }}')">Cancel</button>{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}<p class="na">Nothing queued. <a href="/new">Analyse a video</a>.</p>{% endif %}
+</section>
+{% endblock %}
+{% block script %}
+<script>
+async function cancelJob(id){
+  if(!confirm("Stop this analysis? Finished steps keep their cached output, so it can be resumed.")) return;
+  const r = await fetch(`/jobs/${id}/cancel`, {method:"POST"});
+  alert((await r.json()).detail || "cancelled"); location.reload();
+}
+async function poll(){
+  try{
+    const d = await (await fetch("/api/jobs")).json();
+    for(const j of d.jobs){
+      const row = document.querySelector(`tr[data-job="${j.id}"]`);
+      if(!row) { location.reload(); return; }
+      row.querySelector(".c-status").innerHTML = `<span class="chip s-${j.status}">${j.status}</span>`;
+      row.querySelector(".c-elapsed").textContent = Math.round(j.elapsed_s) + "s";
+      row.querySelector(".c-last").textContent = j.log.length ? j.log[j.log.length-1] : "";
+    }
+  }catch(e){}
+  setTimeout(poll, 2000);
+}
+poll();
+</script>
+{% endblock %}
