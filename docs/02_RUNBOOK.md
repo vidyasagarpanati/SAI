@@ -30,6 +30,26 @@ no wheels for it. Use 3.11 or 3.12.
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
+```
+
+### If `archery` is not recognised
+
+PowerShell does not run commands from the current directory, and the `archery`
+console script only reaches PATH while the venv is activated. The repo ships
+`archery.bat`, which calls the venv's own python, so the shortest fix is the
+leading `.\`:
+
+```powershell
+.\archery serve --videos "D:\Archery-InputData" --open
+.\archery doctor
+```
+
+That works whether or not the venv is activated. The prompt tells you which
+state you are in: `(.venv) PS D:\SAI>` means activated, plain `PS D:\SAI>`
+means not. To install into the venv without activating it:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
 
 # 1. Create the metadata sidecar
 archery init-session --video "D:\archery\kalpana_shot01.mp4"
