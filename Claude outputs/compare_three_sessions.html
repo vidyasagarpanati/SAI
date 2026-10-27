@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Archery Shot Comparison - S1 2026-08-13 vs S2 2026-08-20 vs S3 2026-08-27</title>
+<style>
+:root{--ink:#1d2330;--muted:#5d6678;--line:#dfe3ea;--bg:#f6f7fa;--card:#fff;--accent:#1f4e79;
+--hi:#1e7d4f;--me:#b7791f;--lo:#b8322a;--chip:#eef1f6;
+--seg-a:#86b6ef;--seg-b:#2a78d6;--seg-a-ink:#0b0b0b;--seg-b-ink:#fcfcfb;
+--series:#2a78d6;--critical:#d03b3b;--grid:#e1e0d9;--axis:#898781}
+@media (prefers-color-scheme:dark){:root:where(:not([data-theme="light"])){
+--ink:#fff;--muted:#c3c2b7;--line:#2c2c2a;--bg:#0d0d0d;--card:#1a1a19;--accent:#86b6ef;
+--chip:#26262400;--seg-a:#cde2fb;--seg-b:#5598e7;--seg-a-ink:#0b0b0b;--seg-b-ink:#0b0b0b;
+--series:#3987e5;--critical:#d03b3b;--grid:#2c2c2a;--axis:#898781}}
+:root[data-theme="dark"]{--ink:#fff;--muted:#c3c2b7;--line:#2c2c2a;--bg:#0d0d0d;--card:#1a1a19;
+--accent:#86b6ef;--seg-a:#cde2fb;--seg-b:#5598e7;--seg-a-ink:#0b0b0b;--seg-b-ink:#0b0b0b;
+--series:#3987e5;--grid:#2c2c2a}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+color:var(--ink);background:var(--bg)}
+header.top{background:linear-gradient(120deg,#12324f,#1f4e79);color:#fff;padding:26px 32px}
+header.top h1{margin:0 0 4px;font-size:23px;letter-spacing:.3px}
+header.top .sub{opacity:.85;font-size:13px}
+main{max-width:1180px;margin:0 auto;padding:20px 16px 60px}
+section{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:20px 24px;margin:18px 0}
+section h2{margin:0 0 6px;font-size:19px;color:var(--accent);border-bottom:2px solid var(--line);padding-bottom:8px}
+section h3{font-size:15px;margin:18px 0 6px}
+p.cap{font-size:12.5px;color:var(--muted);margin:6px 0 0}
+table{border-collapse:collapse;width:100%;margin:8px 0 14px;font-size:13.5px}
+th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+th{background:var(--chip)}
+td.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.chip{display:inline-block;font-size:11px;font-weight:600;padding:1px 7px;border-radius:10px;background:var(--chip);color:var(--ink)}
+.c-HIGH{background:#e3f4ec;color:var(--hi)}.c-MEDIUM{background:#fbf1de;color:var(--me)}.c-LOW{background:#fbe6e4;color:var(--lo)}
+.na{color:var(--muted);font-style:italic}
+.warn{background:#fff4e5;border:1px solid #f0d3a5;border-left:6px solid var(--me);border-radius:8px;padding:12px 16px;margin:10px 0;font-size:13.5px}
+.kv{display:grid;grid-template-columns:230px 1fr;gap:4px 14px;font-size:13.5px}
+.kv div:nth-child(odd){color:var(--muted)}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;margin:8px 0 0;font-size:12.5px;color:var(--muted)}
+.legend .lg b{color:var(--ink);font-family:ui-monospace,Menlo,Consolas,monospace}
+.chart{width:100%;height:auto;display:block}
+.facets{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;margin-top:10px}
+.facet{width:100%;height:auto}
+svg text{font:11px system-ui,-apple-system,"Segoe UI",sans-serif;fill:var(--muted)}
+svg .facet-title{font-size:12.5px;font-weight:600;fill:var(--ink)}
+svg .facet-sub,svg .tick,svg .axis-title{font-size:10.5px;fill:var(--axis);font-variant-numeric:tabular-nums}
+svg .rowlab,svg .total{font-size:11px;fill:var(--muted);font-variant-numeric:tabular-nums}
+svg .group{font-size:12px;font-weight:600;fill:var(--ink)}
+svg .grid{stroke:var(--grid);stroke-width:1}
+svg .mean{stroke:var(--axis);stroke-width:1;stroke-dasharray:4 3}
+svg .trend{fill:none;stroke:var(--series);stroke-width:2;stroke-linejoin:round}
+svg .dot{fill:var(--series);stroke:var(--card);stroke-width:2}
+svg .dot.flag{fill:var(--critical)}
+svg .flagmark{fill:var(--critical)}
+svg .seg-a{fill:var(--seg-a)}svg .seg-b{fill:var(--seg-b)}
+svg .soft{fill:none;stroke:var(--seg-b);stroke-width:1.5;stroke-dasharray:3 2}
+svg .flatval{font-size:17px;font-weight:600;fill:var(--ink);font-variant-numeric:tabular-nums}
+svg .badge{font-size:9.5px;font-weight:700;font-family:ui-monospace,Menlo,Consolas,monospace}
+svg .seg-a-ink{fill:var(--seg-a-ink)}svg .seg-b-ink{fill:var(--seg-b-ink)}
+footer{color:var(--muted);font-size:12px;text-align:center;margin-top:30px}
+@media (max-width:720px){.kv{grid-template-columns:1fr}section{padding:16px}}
+@media print{section{break-inside:avoid-page}}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Shot comparison across sessions</h1>
+  <div class="sub">S1 2026-08-13 vs S2 2026-08-20 vs S3 2026-08-27 &middot; 3 sessions,
+    14 shots &middot; generated 2026-09-28 16:48 &middot; </div>
+</header>
+<main>
+
+<section>
+  <h2>What is being compared</h2>
+  <table><tr><th>#</th><th>Run</th><th>Athlete</th><th>Session date</th><th>Camera view</th>
+    <th>Shots</th><th>Measured fps</th></tr>
+  <tr><td>S1</td><td>Kalapna__aug13</td>
+    <td>Kalpana Ragar</td><td>2026-08-13</td>
+    <td>side-on (bow-arm side)</td><td class="num">5</td>
+    <td class="num">60.00</td></tr><tr><td>S2</td><td>Kalapna__aug20</td>
+    <td>Kalpana Ragar</td><td>2026-08-20</td>
+    <td>side-on (bow-arm side)</td><td class="num">5</td>
+    <td class="num">60.00</td></tr><tr><td>S3</td><td>Kalapna__aug27</td>
+    <td>Kalpana Ragar</td><td>2026-08-27</td>
+    <td>side-on (bow-arm side)</td><td class="num">4</td>
+    <td class="num">60.00</td></tr>
+  </table>
+  <p class="cap">Sessions are shown in the order the runs were passed on the
+  command line. Nothing has been reordered.</p>
+
+  
+  
+
+  <h3>What may be compared, and what may not</h3>
+  <p class="cap">Phase durations are in seconds and the true capture rate is measured per
+  video, so they compare across every session here. Joint angles are image-plane
+  projections, so a session filmed from a different position measures a different
+  quantity under the same name; those charts are drawn only within a camera view.
+  Anchor distance is normalised by shoulder width and travels between views.</p>
+</section>
+
+<section>
+  <h2>Shot timeline</h2>
+  <svg class="chart" viewBox="0 0 900 480" role="img" aria-label="Phase durations for every shot, seconds from the start of the shot">
+<line class="grid" x1="132.0" y1="26" x2="132.0" y2="466"/>
+<text class="tick" x="132.0" y="20" text-anchor="middle">0s</text>
+<line class="grid" x1="380.0" y1="26" x2="380.0" y2="466"/>
+<text class="tick" x="380.0" y="20" text-anchor="middle">2s</text>
+<line class="grid" x1="627.9" y1="26" x2="627.9" y2="466"/>
+<text class="tick" x="627.9" y="20" text-anchor="middle">4s</text>
+<text class="group" x="4" y="48">S1 &middot; 2026-08-13</text>
+<text class="rowlab" x="124" y="71" text-anchor="end">S1 shot 1</text>
+<g><rect class="seg-a" x="132.0" y="60" width="140.6" height="16" rx="3"/><title>S1 shot 1 &#183; Stance / Setup &#183; 1.15s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="202.3" y="72" text-anchor="middle">1</text>
+<g><rect class="seg-b" x="274.6" y="60" width="47.6" height="16" rx="3"/><title>S1 shot 1 &#183; Pre-draw &#183; 0.40s &#183; boundary HIGH</title></g>
+<text class="badge seg-b-ink" x="298.4" y="72" text-anchor="middle">2</text>
+<g><rect class="seg-a" x="324.2" y="60" width="66.2" height="16" rx="3"/><title>S1 shot 1 &#183; Draw &#183; 0.55s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="357.3" y="72" text-anchor="middle">3</text>
+<g><rect class="seg-b" x="392.4" y="60" width="14.5" height="16" rx="3"/><title>S1 shot 1 &#183; Anchor &#183; 0.13s &#183; boundary HIGH</title></g>
+<g><rect class="seg-a" x="408.8" y="60" width="124.1" height="16" rx="3"/><title>S1 shot 1 &#183; Aim / Approach &#183; 1.02s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="470.9" y="72" text-anchor="middle">5</text>
+<g><rect class="seg-b" x="534.9" y="60" width="33.1" height="16" rx="3"/><title>S1 shot 1 &#183; Expansion &#183; 0.28s &#183; boundary HIGH</title></g>
+<text class="badge seg-b-ink" x="551.5" y="72" text-anchor="middle">6</text>
+<g><rect class="seg-a" x="570.0" y="60" width="8.3" height="16" rx="3"/><title>S1 shot 1 &#183; Release &#183; 0.08s &#183; boundary HIGH</title></g>
+<g><rect class="seg-b" x="580.3" y="60" width="72.4" height="16" rx="3"/><title>S1 shot 1 &#183; Follow-through &#183; 0.60s &#183; boundary HIGH</title></g>
+<text class="badge seg-b-ink" x="616.5" y="72" text-anchor="middle">8</text>
+<g><rect class="seg-a" x="654.7" y="60" width="72.4" height="16" rx="3"/><title>S1 shot 1 &#183; Recovery &#183; 0.60s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="690.9" y="72" text-anchor="middle">9</text>
+<text class="total" x="735.1" y="71">4.82s</text>
+<text class="rowlab" x="124" y="97" text-anchor="end">S1 shot 2</text>
+<g><rect class="seg-a" x="132.0" y="86" width="165.4" height="16" rx="3"/><title>S1 shot 2 &#183; Stance / Setup &#183; 1.35s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="214.7" y="98" text-anchor="middle">1</text>
+<g><rect class="seg-b" x="299.4" y="86" width="55.9" height="16" rx="3"/><title>S1 shot 2 &#183; Pre-draw &#183; 0.47s &#183; boundary HIGH</title></g>
+<text class="badge seg-b-ink" x="327.3" y="98" text-anchor="middle">2</text>
+<g><rect class="seg-a" x="357.3" y="86" width="55.9" height="16" rx="3"/><title>S1 shot 2 &#183; Draw &#183; 0.47s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="385.2" y="98" text-anchor="middle">3</text>
+<g><rect class="seg-b" x="415.2" y="86" width="14.5" height="16" rx="3"/><title>S1 shot 2 &#183; Anchor &#183; 0.13s &#183; boundary HIGH</title></g>
+<g><rect class="seg-a" x="431.7" y="86" width="128.2" height="16" rx="3"/><title>S1 shot 2 &#183; Aim / Approach &#183; 1.05s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="495.7" y="98" text-anchor="middle">5</text>
+<g><rect class="seg-b" x="561.8" y="86" width="29.0" height="16" rx="3"/><title>S1 shot 2 &#183; Expansion &#183; 0.25s &#183; boundary HIGH</title></g>
+<text class="badge seg-b-ink" x="576.3" y="98" text-anchor="middle">6</text>
+<g><rect class="seg-a" x="592.8" y="86" width="8.3" height="16" rx="3"/><title>S1 shot 2 &#183; Release &#183; 0.08s &#183; boundary HIGH</title></g>
+<g><rect class="seg-b" x="603.1" y="86" width="72.4" height="16" rx="3"/><title>S1 shot 2 &#183; Follow-through &#183; 0.60s &#183; boundary HIGH</title></g>
+<text class="badge seg-b-ink" x="639.3" y="98" text-anchor="middle">8</text>
+<g><rect class="seg-a" x="677.5" y="86" width="72.4" height="16" rx="3"/><title>S1 shot 2 &#183; Recovery &#183; 0.60s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="713.7" y="98" text-anchor="middle">9</text>
+<text class="total" x="757.9" y="97">5.00s</text>
+<text class="rowlab" x="124" y="123" text-anchor="end">S1 shot 3</text>
+<g><rect class="seg-a" x="132.0" y="112" width="165.4" height="16" rx="3"/><title>S1 shot 3 &#183; Stance / Setup &#183; 1.35s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="214.7" y="124" text-anchor="middle">1</text>
+<g><rect class="seg-b" x="299.4" y="112" width="57.9" height="16" rx="3"/><title>S1 shot 3 &#183; Pre-draw &#183; 0.48s &#183; boundary HIGH</title></g>
+<text class="badge seg-b-ink" x="328.3" y="124" text-anchor="middle">2</text>
+<g><rect class="seg-a" x="359.3" y="112" width="53.8" height="16" rx="3"/><title>S1 shot 3 &#183; Draw &#183; 0.45s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="386.1" y="124" text-anchor="middle">3</text>
+<g><rect class="seg-b" x="415.0" y="112" width="14.5" height="16" rx="3"/><title>S1 shot 3 &#183; Anchor &#183; 0.13s &#183; boundary HIGH</title></g>
+<g><rect class="seg-a" x="431.5" y="112" width="111.7" height="16" rx="3"/><title>S1 shot 3 &#183; Aim / Approach &#183; 0.92s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="487.4" y="124" text-anchor="middle">5</text>
+<g><rect class="seg-b" x="545.2" y="112" width="45.5" height="16" rx="3"/><title>S1 shot 3 &#183; Expansion &#183; 0.38s &#183; boundary HIGH</title></g>
+<text class="badge seg-b-ink" x="568.0" y="124" text-anchor="middle">6</text>
+<g><rect class="seg-a" x="592.7" y="112" width="8.3" height="16" rx="3"/><title>S1 shot 3 &#183; Release &#183; 0.08s &#183; boundary HIGH</title></g>
+<g><rect class="seg-b" x="603.0" y="112" width="72.4" height="16" rx="3"/><title>S1 shot 3 &#183; Follow-through &#183; 0.60s &#183; boundary HIGH</title></g>
+<text class="badge seg-b-ink" x="639.2" y="124" text-anchor="middle">8</text>
+<g><rect class="seg-a" x="677.4" y="112" width="72.4" height="16" rx="3"/><title>S1 shot 3 &#183; Recovery &#183; 0.60s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="713.6" y="124" text-anchor="middle">9</text>
+<text class="total" x="757.8" y="123">5.00s</text>
+<text class="rowlab" x="124" y="149" text-anchor="end">S1 shot 4</text>
+<g><rect class="seg-a" x="132.0" y="138" width="161.3" height="16" rx="3"/><title>S1 shot 4 &#183; Stance / Setup &#183; 1.32s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="212.6" y="150" text-anchor="middle">1</text>
+<g><rect class="seg-b" x="295.3" y="138" width="117.9" height="16" rx="3"/><title>S1 shot 4 &#183; Draw &#183; 0.97s &#183; boundary MEDIUM</title></g>
+<text class="badge seg-b-ink" x="354.2" y="150" text-anchor="middle">3</text>
+<g><rect class="seg-a" x="415.2" y="138" width="14.5" height="16" rx="3"/><title>S1 shot 4 &#183; Anchor &#183; 0.13s &#183; boundary HIGH</title></g>
+<g><rect class="seg-b" x="431.7" y="138" width="113.7" height="16" rx="3"/><title>S1 shot 4 &#183; Aim / Approach &#183; 0.93s &#183; boundary HIGH</title></g>
+<text class="badge seg-b-ink" x="488.5" y="150" text-anchor="middle">5</text>
+<g><rect class="seg-a" x="547.3" y="138" width="43.5" height="16" rx="3"/><title>S1 shot 4 &#183; Expansion &#183; 0.37s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="569.1" y="150" text-anchor="middle">6</text>
+<g><rect class="seg-b" x="592.8" y="138" width="8.3" height="16" rx="3"/><title>S1 shot 4 &#183; Release &#183; 0.08s &#183; boundary HIGH</title></g>
+<g><rect class="seg-a" x="603.1" y="138" width="72.4" height="16" rx="3"/><title>S1 shot 4 &#183; Follow-through &#183; 0.60s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="639.3" y="150" text-anchor="middle">8</text>
+<g><rect class="seg-b" x="677.5" y="138" width="68.3" height="16" rx="3"/><title>S1 shot 4 &#183; Recovery &#183; 0.57s &#183; boundary HIGH</title></g>
+<text class="badge seg-b-ink" x="711.7" y="150" text-anchor="middle">9</text>
+<text class="total" x="753.8" y="149">4.97s</text>
+<text class="rowlab" x="124" y="175" text-anchor="end">S1 shot 5</text>
+<g><rect class="seg-a" x="132.0" y="164" width="167.5" height="16" rx="3"/><title>S1 shot 5 &#183; Stance / Setup &#183; 1.37s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="215.7" y="176" text-anchor="middle">1</text>
+<g><rect class="seg-b" x="301.5" y="164" width="64.1" height="16" rx="3"/><title>S1 shot 5 &#183; Pre-draw &#183; 0.53s &#183; boundary HIGH</title></g>
+<text class="badge seg-b-ink" x="333.5" y="176" text-anchor="middle">2</text>
+<g><rect class="seg-a" x="367.6" y="164" width="51.7" height="16" rx="3"/><title>S1 shot 5 &#183; Draw &#183; 0.43s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="393.4" y="176" text-anchor="middle">3</text>
+<g><rect class="seg-b" x="421.2" y="164" width="26.9" height="16" rx="3"/><title>S1 shot 5 &#183; Anchor &#183; 0.23s &#183; boundary HIGH</title></g>
+<text class="badge seg-b-ink" x="434.7" y="176" text-anchor="middle">4</text>
+<g><rect class="seg-a" x="450.1" y="164" width="144.7" height="16" rx="3"/><title>S1 shot 5 &#183; Aim / Approach &#183; 1.18s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="522.5" y="176" text-anchor="middle">5</text>
+<g><rect class="seg-b" x="596.8" y="164" width="8.3" height="16" rx="3"/><title>S1 shot 5 &#183; Release &#183; 0.08s &#183; boundary HIGH</title></g>
+<g><rect class="seg-a" x="607.1" y="164" width="72.4" height="16" rx="3"/><title>S1 shot 5 &#183; Follow-through &#183; 0.60s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="643.3" y="176" text-anchor="middle">8</text>
+<g><rect class="seg-b" x="681.5" y="164" width="72.4" height="16" rx="3"/><title>S1 shot 5 &#183; Recovery &#183; 0.60s &#183; boundary HIGH</title></g>
+<text class="badge seg-b-ink" x="717.7" y="176" text-anchor="middle">9</text>
+<text class="total" x="761.9" y="175">5.03s</text>
+<text class="group" x="4" y="200">S2 &middot; 2026-08-20</text>
+<text class="rowlab" x="124" y="223" text-anchor="end">S2 shot 1</text>
+<g><rect class="seg-a" x="132.0" y="212" width="140.6" height="16" rx="3"/><title>S2 shot 1 &#183; Stance / Setup &#183; 1.15s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="202.3" y="224" text-anchor="middle">1</text>
+<g><rect class="seg-b" x="274.6" y="212" width="47.6" height="16" rx="3"/><title>S2 shot 1 &#183; Pre-draw &#183; 0.40s &#183; boundary HIGH</title></g>
+<text class="badge seg-b-ink" x="298.4" y="224" text-anchor="middle">2</text>
+<g><rect class="seg-a" x="324.2" y="212" width="66.2" height="16" rx="3"/><title>S2 shot 1 &#183; Draw &#183; 0.55s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="357.3" y="224" text-anchor="middle">3</text>
+<g><rect class="seg-b" x="392.4" y="212" width="14.5" height="16" rx="3"/><title>S2 shot 1 &#183; Anchor &#183; 0.13s &#183; boundary HIGH</title></g>
+<g><rect class="seg-a" x="408.8" y="212" width="124.1" height="16" rx="3"/><title>S2 shot 1 &#183; Aim / Approach &#183; 1.02s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="470.9" y="224" text-anchor="middle">5</text>
+<g><rect class="seg-b" x="534.9" y="212" width="33.1" height="16" rx="3"/><title>S2 shot 1 &#183; Expansion &#183; 0.28s &#183; boundary HIGH</title></g>
+<text class="badge seg-b-ink" x="551.5" y="224" text-anchor="middle">6</text>
+<g><rect class="seg-a" x="570.0" y="212" width="8.3" height="16" rx="3"/><title>S2 shot 1 &#183; Release &#183; 0.08s &#183; boundary HIGH</title></g>
+<g><rect class="seg-b" x="580.3" y="212" width="72.4" height="16" rx="3"/><title>S2 shot 1 &#183; Follow-through &#183; 0.60s &#183; boundary HIGH</title></g>
+<text class="badge seg-b-ink" x="616.5" y="224" text-anchor="middle">8</text>
+<g><rect class="seg-a" x="654.7" y="212" width="72.4" height="16" rx="3"/><title>S2 shot 1 &#183; Recovery &#183; 0.60s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="690.9" y="224" text-anchor="middle">9</text>
+<text class="total" x="735.1" y="223">4.82s</text>
+<text class="rowlab" x="124" y="249" text-anchor="end">S2 shot 2</text>
+<g><rect class="seg-a" x="132.0" y="238" width="165.4" height="16" rx="3"/><title>S2 shot 2 &#183; Stance / Setup &#183; 1.35s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="214.7" y="250" text-anchor="middle">1</text>
+<g><rect class="seg-b" x="299.4" y="238" width="55.9" height="16" rx="3"/><title>S2 shot 2 &#183; Pre-draw &#183; 0.47s &#183; boundary HIGH</title></g>
+<text class="badge seg-b-ink" x="327.3" y="250" text-anchor="middle">2</text>
+<g><rect class="seg-a" x="357.3" y="238" width="55.9" height="16" rx="3"/><title>S2 shot 2 &#183; Draw &#183; 0.47s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="385.2" y="250" text-anchor="middle">3</text>
+<g><rect class="seg-b" x="415.2" y="238" width="14.5" height="16" rx="3"/><title>S2 shot 2 &#183; Anchor &#183; 0.13s &#183; boundary HIGH</title></g>
+<g><rect class="seg-a" x="431.7" y="238" width="206.3" height="16" rx="3"/><title>S2 shot 2 &#183; Aim / Approach &#183; 1.68s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="534.8" y="250" text-anchor="middle">5</text>
+<g><rect class="seg-b" x="639.9" y="238" width="29.0" height="16" rx="3"/><title>S2 shot 2 &#183; Expansion &#183; 0.25s &#183; boundary HIGH</title></g>
+<text class="badge seg-b-ink" x="654.4" y="250" text-anchor="middle">6</text>
+<g><rect class="seg-a" x="670.9" y="238" width="8.3" height="16" rx="3"/><title>S2 shot 2 &#183; Release &#183; 0.08s &#183; boundary HIGH</title></g>
+<g><rect class="seg-b" x="681.2" y="238" width="72.4" height="16" rx="3"/><title>S2 shot 2 &#183; Follow-through &#183; 0.60s &#183; boundary HIGH</title></g>
+<text class="badge seg-b-ink" x="717.4" y="250" text-anchor="middle">8</text>
+<g><rect class="seg-a" x="755.6" y="238" width="72.4" height="16" rx="3"/><title>S2 shot 2 &#183; Recovery &#183; 0.60s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="791.8" y="250" text-anchor="middle">9</text>
+<text class="total" x="836.0" y="249">5.63s</text>
+<text class="rowlab" x="124" y="275" text-anchor="end">S2 shot 3</text>
+<g><rect class="seg-a" x="132.0" y="264" width="165.4" height="16" rx="3"/><title>S2 shot 3 &#183; Stance / Setup &#183; 1.35s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="214.7" y="276" text-anchor="middle">1</text>
+<g><rect class="seg-b" x="299.4" y="264" width="57.9" height="16" rx="3"/><title>S2 shot 3 &#183; Pre-draw &#183; 0.48s &#183; boundary HIGH</title></g>
+<text class="badge seg-b-ink" x="328.3" y="276" text-anchor="middle">2</text>
+<g><rect class="seg-a" x="359.3" y="264" width="53.8" height="16" rx="3"/><title>S2 shot 3 &#183; Draw &#183; 0.45s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="386.1" y="276" text-anchor="middle">3</text>
+<g><rect class="seg-b" x="415.0" y="264" width="14.5" height="16" rx="3"/><title>S2 shot 3 &#183; Anchor &#183; 0.13s &#183; boundary HIGH</title></g>
+<g><rect class="seg-a" x="431.5" y="264" width="111.7" height="16" rx="3"/><title>S2 shot 3 &#183; Aim / Approach &#183; 0.92s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="487.4" y="276" text-anchor="middle">5</text>
+<g><rect class="seg-b" x="545.2" y="264" width="45.5" height="16" rx="3"/><title>S2 shot 3 &#183; Expansion &#183; 0.38s &#183; boundary HIGH</title></g>
+<text class="badge seg-b-ink" x="568.0" y="276" text-anchor="middle">6</text>
+<g><rect class="seg-a" x="592.7" y="264" width="8.3" height="16" rx="3"/><title>S2 shot 3 &#183; Release &#183; 0.08s &#183; boundary HIGH</title></g>
+<g><rect class="seg-b" x="603.0" y="264" width="72.4" height="16" rx="3"/><title>S2 shot 3 &#183; Follow-through &#183; 0.60s &#183; boundary HIGH</title></g>
+<text class="badge seg-b-ink" x="639.2" y="276" text-anchor="middle">8</text>
+<g><rect class="seg-a" x="677.4" y="264" width="72.4" height="16" rx="3"/><title>S2 shot 3 &#183; Recovery &#183; 0.60s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="713.6" y="276" text-anchor="middle">9</text>
+<text class="total" x="757.8" y="275">5.00s</text>
+<text class="rowlab" x="124" y="301" text-anchor="end">S2 shot 4</text>
+<g><rect class="seg-a" x="132.0" y="290" width="161.3" height="16" rx="3"/><title>S2 shot 4 &#183; Stance / Setup &#183; 1.32s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="212.6" y="302" text-anchor="middle">1</text>
+<g><rect class="seg-b" x="295.3" y="290" width="117.9" height="16" rx="3"/><title>S2 shot 4 &#183; Draw &#183; 0.97s &#183; boundary MEDIUM</title></g>
+<text class="badge seg-b-ink" x="354.2" y="302" text-anchor="middle">3</text>
+<g><rect class="seg-a" x="415.2" y="290" width="14.5" height="16" rx="3"/><title>S2 shot 4 &#183; Anchor &#183; 0.13s &#183; boundary HIGH</title></g>
+<g><rect class="seg-b" x="431.7" y="290" width="113.7" height="16" rx="3"/><title>S2 shot 4 &#183; Aim / Approach &#183; 0.93s &#183; boundary HIGH</title></g>
+<text class="badge seg-b-ink" x="488.5" y="302" text-anchor="middle">5</text>
+<g><rect class="seg-a" x="547.3" y="290" width="43.5" height="16" rx="3"/><title>S2 shot 4 &#183; Expansion &#183; 0.37s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="569.1" y="302" text-anchor="middle">6</text>
+<g><rect class="seg-b" x="592.8" y="290" width="8.3" height="16" rx="3"/><title>S2 shot 4 &#183; Release &#183; 0.08s &#183; boundary HIGH</title></g>
+<g><rect class="seg-a" x="603.1" y="290" width="72.4" height="16" rx="3"/><title>S2 shot 4 &#183; Follow-through &#183; 0.60s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="639.3" y="302" text-anchor="middle">8</text>
+<g><rect class="seg-b" x="677.5" y="290" width="68.3" height="16" rx="3"/><title>S2 shot 4 &#183; Recovery &#183; 0.57s &#183; boundary HIGH</title></g>
+<text class="badge seg-b-ink" x="711.7" y="302" text-anchor="middle">9</text>
+<text class="total" x="753.8" y="301">4.97s</text>
+<text class="rowlab" x="124" y="327" text-anchor="end">S2 shot 5</text>
+<g><rect class="seg-a" x="132.0" y="316" width="167.5" height="16" rx="3"/><title>S2 shot 5 &#183; Stance / Setup &#183; 1.37s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="215.7" y="328" text-anchor="middle">1</text>
+<g><rect class="seg-b" x="301.5" y="316" width="64.1" height="16" rx="3"/><title>S2 shot 5 &#183; Pre-draw &#183; 0.53s &#183; boundary HIGH</title></g>
+<text class="badge seg-b-ink" x="333.5" y="328" text-anchor="middle">2</text>
+<g><rect class="seg-a" x="367.6" y="316" width="51.7" height="16" rx="3"/><title>S2 shot 5 &#183; Draw &#183; 0.43s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="393.4" y="328" text-anchor="middle">3</text>
+<g><rect class="seg-b" x="421.2" y="316" width="26.9" height="16" rx="3"/><title>S2 shot 5 &#183; Anchor &#183; 0.23s &#183; boundary HIGH</title></g>
+<text class="badge seg-b-ink" x="434.7" y="328" text-anchor="middle">4</text>
+<g><rect class="seg-a" x="450.1" y="316" width="144.7" height="16" rx="3"/><title>S2 shot 5 &#183; Aim / Approach &#183; 1.18s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="522.5" y="328" text-anchor="middle">5</text>
+<g><rect class="seg-b" x="596.8" y="316" width="8.3" height="16" rx="3"/><title>S2 shot 5 &#183; Release &#183; 0.08s &#183; boundary HIGH</title></g>
+<g><rect class="seg-a" x="607.1" y="316" width="72.4" height="16" rx="3"/><title>S2 shot 5 &#183; Follow-through &#183; 0.60s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="643.3" y="328" text-anchor="middle">8</text>
+<g><rect class="seg-b" x="681.5" y="316" width="72.4" height="16" rx="3"/><title>S2 shot 5 &#183; Recovery &#183; 0.60s &#183; boundary HIGH</title></g>
+<text class="badge seg-b-ink" x="717.7" y="328" text-anchor="middle">9</text>
+<text class="total" x="761.9" y="327">5.03s</text>
+<text class="group" x="4" y="352">S3 &middot; 2026-08-27</text>
+<text class="rowlab" x="124" y="375" text-anchor="end">S3 shot 1</text>
+<g><rect class="seg-a" x="132.0" y="364" width="140.6" height="16" rx="3"/><title>S3 shot 1 &#183; Stance / Setup &#183; 1.15s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="202.3" y="376" text-anchor="middle">1</text>
+<g><rect class="seg-b" x="274.6" y="364" width="47.6" height="16" rx="3"/><title>S3 shot 1 &#183; Pre-draw &#183; 0.40s &#183; boundary HIGH</title></g>
+<text class="badge seg-b-ink" x="298.4" y="376" text-anchor="middle">2</text>
+<g><rect class="seg-a" x="324.2" y="364" width="66.2" height="16" rx="3"/><title>S3 shot 1 &#183; Draw &#183; 0.55s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="357.3" y="376" text-anchor="middle">3</text>
+<g><rect class="seg-b" x="392.4" y="364" width="14.5" height="16" rx="3"/><title>S3 shot 1 &#183; Anchor &#183; 0.13s &#183; boundary HIGH</title></g>
+<g><rect class="seg-a" x="408.8" y="364" width="124.1" height="16" rx="3"/><title>S3 shot 1 &#183; Aim / Approach &#183; 1.02s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="470.9" y="376" text-anchor="middle">5</text>
+<g><rect class="seg-b" x="534.9" y="364" width="33.1" height="16" rx="3"/><title>S3 shot 1 &#183; Expansion &#183; 0.28s &#183; boundary HIGH</title></g>
+<text class="badge seg-b-ink" x="551.5" y="376" text-anchor="middle">6</text>
+<g><rect class="seg-a" x="570.0" y="364" width="8.3" height="16" rx="3"/><title>S3 shot 1 &#183; Release &#183; 0.08s &#183; boundary HIGH</title></g>
+<g><rect class="seg-b" x="580.3" y="364" width="72.4" height="16" rx="3"/><title>S3 shot 1 &#183; Follow-through &#183; 0.60s &#183; boundary HIGH</title></g>
+<text class="badge seg-b-ink" x="616.5" y="376" text-anchor="middle">8</text>
+<g><rect class="seg-a" x="654.7" y="364" width="72.4" height="16" rx="3"/><title>S3 shot 1 &#183; Recovery &#183; 0.60s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="690.9" y="376" text-anchor="middle">9</text>
+<text class="total" x="735.1" y="375">4.82s</text>
+<text class="rowlab" x="124" y="401" text-anchor="end">S3 shot 2</text>
+<g><rect class="seg-a" x="132.0" y="390" width="165.4" height="16" rx="3"/><title>S3 shot 2 &#183; Stance / Setup &#183; 1.35s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="214.7" y="402" text-anchor="middle">1</text>
+<g><rect class="seg-b" x="299.4" y="390" width="55.9" height="16" rx="3"/><title>S3 shot 2 &#183; Pre-draw &#183; 0.47s &#183; boundary HIGH</title></g>
+<text class="badge seg-b-ink" x="327.3" y="402" text-anchor="middle">2</text>
+<g><rect class="seg-a" x="357.3" y="390" width="55.9" height="16" rx="3"/><title>S3 shot 2 &#183; Draw &#183; 0.47s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="385.2" y="402" text-anchor="middle">3</text>
+<g><rect class="seg-b" x="415.2" y="390" width="14.5" height="16" rx="3"/><title>S3 shot 2 &#183; Anchor &#183; 0.13s &#183; boundary HIGH</title></g>
+<g><rect class="seg-a" x="431.7" y="390" width="128.2" height="16" rx="3"/><title>S3 shot 2 &#183; Aim / Approach &#183; 1.05s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="495.7" y="402" text-anchor="middle">5</text>
+<g><rect class="seg-b" x="561.8" y="390" width="29.0" height="16" rx="3"/><title>S3 shot 2 &#183; Expansion &#183; 0.25s &#183; boundary HIGH</title></g>
+<text class="badge seg-b-ink" x="576.3" y="402" text-anchor="middle">6</text>
+<g><rect class="seg-a" x="592.8" y="390" width="8.3" height="16" rx="3"/><title>S3 shot 2 &#183; Release &#183; 0.08s &#183; boundary HIGH</title></g>
+<g><rect class="seg-b" x="603.1" y="390" width="72.4" height="16" rx="3"/><title>S3 shot 2 &#183; Follow-through &#183; 0.60s &#183; boundary HIGH</title></g>
+<text class="badge seg-b-ink" x="639.3" y="402" text-anchor="middle">8</text>
+<g><rect class="seg-a" x="677.5" y="390" width="72.4" height="16" rx="3"/><title>S3 shot 2 &#183; Recovery &#183; 0.60s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="713.7" y="402" text-anchor="middle">9</text>
+<text class="total" x="757.9" y="401">5.00s</text>
+<text class="rowlab" x="124" y="427" text-anchor="end">S3 shot 3</text>
+<g><rect class="seg-a" x="132.0" y="416" width="165.4" height="16" rx="3"/><title>S3 shot 3 &#183; Stance / Setup &#183; 1.35s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="214.7" y="428" text-anchor="middle">1</text>
+<g><rect class="seg-b" x="299.4" y="416" width="57.9" height="16" rx="3"/><title>S3 shot 3 &#183; Pre-draw &#183; 0.48s &#183; boundary HIGH</title></g>
+<text class="badge seg-b-ink" x="328.3" y="428" text-anchor="middle">2</text>
+<g><rect class="seg-a" x="359.3" y="416" width="53.8" height="16" rx="3"/><title>S3 shot 3 &#183; Draw &#183; 0.45s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="386.1" y="428" text-anchor="middle">3</text>
+<g><rect class="seg-b" x="415.0" y="416" width="14.5" height="16" rx="3"/><title>S3 shot 3 &#183; Anchor &#183; 0.13s &#183; boundary HIGH</title></g>
+<g><rect class="seg-a" x="431.5" y="416" width="111.7" height="16" rx="3"/><title>S3 shot 3 &#183; Aim / Approach &#183; 0.92s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="487.4" y="428" text-anchor="middle">5</text>
+<g><rect class="seg-b" x="545.2" y="416" width="45.5" height="16" rx="3"/><title>S3 shot 3 &#183; Expansion &#183; 0.38s &#183; boundary HIGH</title></g>
+<text class="badge seg-b-ink" x="568.0" y="428" text-anchor="middle">6</text>
+<g><rect class="seg-a" x="592.7" y="416" width="8.3" height="16" rx="3"/><title>S3 shot 3 &#183; Release &#183; 0.08s &#183; boundary HIGH</title></g>
+<g><rect class="seg-b" x="603.0" y="416" width="72.4" height="16" rx="3"/><title>S3 shot 3 &#183; Follow-through &#183; 0.60s &#183; boundary HIGH</title></g>
+<text class="badge seg-b-ink" x="639.2" y="428" text-anchor="middle">8</text>
+<g><rect class="seg-a" x="677.4" y="416" width="72.4" height="16" rx="3"/><title>S3 shot 3 &#183; Recovery &#183; 0.60s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="713.6" y="428" text-anchor="middle">9</text>
+<text class="total" x="757.8" y="427">5.00s</text>
+<text class="rowlab" x="124" y="453" text-anchor="end">S3 shot 4</text>
+<g><rect class="seg-a" x="132.0" y="442" width="161.3" height="16" rx="3"/><title>S3 shot 4 &#183; Stance / Setup &#183; 1.32s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="212.6" y="454" text-anchor="middle">1</text>
+<g><rect class="seg-b" x="295.3" y="442" width="117.9" height="16" rx="3"/><title>S3 shot 4 &#183; Draw &#183; 0.97s &#183; boundary MEDIUM</title></g>
+<text class="badge seg-b-ink" x="354.2" y="454" text-anchor="middle">3</text>
+<g><rect class="seg-a" x="415.2" y="442" width="14.5" height="16" rx="3"/><title>S3 shot 4 &#183; Anchor &#183; 0.13s &#183; boundary HIGH</title></g>
+<g><rect class="seg-b" x="431.7" y="442" width="113.7" height="16" rx="3"/><title>S3 shot 4 &#183; Aim / Approach &#183; 0.93s &#183; boundary HIGH</title></g>
+<text class="badge seg-b-ink" x="488.5" y="454" text-anchor="middle">5</text>
+<g><rect class="seg-a" x="547.3" y="442" width="43.5" height="16" rx="3"/><title>S3 shot 4 &#183; Expansion &#183; 0.37s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="569.1" y="454" text-anchor="middle">6</text>
+<g><rect class="seg-b" x="592.8" y="442" width="8.3" height="16" rx="3"/><title>S3 shot 4 &#183; Release &#183; 0.08s &#183; boundary HIGH</title></g>
+<g><rect class="seg-a" x="603.1" y="442" width="72.4" height="16" rx="3"/><title>S3 shot 4 &#183; Follow-through &#183; 0.60s &#183; boundary HIGH</title></g>
+<text class="badge seg-a-ink" x="639.3" y="454" text-anchor="middle">8</text>
+<g><rect class="seg-b" x="677.5" y="442" width="68.3" height="16" rx="3"/><title>S3 shot 4 &#183; Recovery &#183; 0.57s &#183; boundary HIGH</title></g>
+<text class="badge seg-b-ink" x="711.7" y="454" text-anchor="middle">9</text>
+<text class="total" x="753.8" y="453">4.97s</text>
+</svg>
+  <div class="legend"><span class="lg"><b>1</b> Stance / Setup</span><span class="lg"><b>2</b> Pre-draw</span><span class="lg"><b>3</b> Draw</span><span class="lg"><b>4</b> Anchor</span><span class="lg"><b>5</b> Aim / Approach</span><span class="lg"><b>6</b> Expansion</span><span class="lg"><b>7</b> Release</span><span class="lg"><b>8</b> Follow-through</span><span class="lg"><b>9</b> Recovery</span></div><p class="cap">Every bar starts at zero: the x axis is seconds from the start of that shot, not clock time, so shots filmed weeks apart sit on one scale. Segments alternate shade only so the boundaries are visible; the badge on each segment names the phase. A hollow segment rests on a LOW-confidence boundary. A phase that was not detected is absent from the bar, never drawn as zero.</p>
+</section>
+
+<section>
+  <h2>Phase duration, session by session</h2>
+  <p class="cap">One panel per phase. Each dot is one shot, the line joins the session
+  means, and the dashed line is the pooled mean across every shot here. A red dot with
+  a triangle above it is flagged: its duration sits more than
+  2.0 standard deviations from the mean of <b>all the other
+  shots</b>, computed without that shot, so an unusual shot cannot pull the line it is
+  judged against toward itself. The dashed pooled mean is for orientation only; the
+  table below is what the flags are computed from.</p>
+  <div class="facets"><svg class="facet" viewBox="0 0 290 170" role="img" aria-label="Stance / Setup">
+<text class="facet-title" x="0" y="13">Stance / Setup</text>
+<text class="facet-sub" x="0" y="27">n=14 shots, pooled SD 0.084s</text>
+<line class="grid" x1="48" y1="111.0" x2="280" y2="111.0"/>
+<text class="tick" x="42" y="114.0" text-anchor="end">1.20</text>
+<line class="grid" x1="48" y1="78.5" x2="280" y2="78.5"/>
+<text class="tick" x="42" y="81.5" text-anchor="end">1.30</text>
+<line class="grid" x1="48" y1="46.0" x2="280" y2="46.0"/>
+<text class="tick" x="42" y="49.0" text-anchor="end">1.40</text>
+<text class="tick" x="46.0" y="160" text-anchor="start">S1</text>
+<text class="tick" x="164.0" y="160" text-anchor="middle">S2</text>
+<text class="tick" x="282.0" y="160" text-anchor="end">S3</text>
+<line class="mean" x1="48" y1="77.7" x2="280" y2="77.7"/>
+<path class="trend" d="M48.0,76.3 L164.0,76.3 L280.0,81.2"/>
+<g><circle class="dot flag" cx="34.0" cy="127.3" r="5"/><title>S1 shot 1 &#183; 1.150 s &#183; FLAGGED</title></g>
+<path class="flagmark" d="M34.0,114.3 l4.5,8 l-9,0 z"/>
+<g><circle class="dot" cx="41.0" cy="62.2" r="5"/><title>S1 shot 2 &#183; 1.350 s</title></g>
+<g><circle class="dot" cx="41.0" cy="62.2" r="5"/><title>S1 shot 3 &#183; 1.350 s</title></g>
+<g><circle class="dot" cx="55.0" cy="73.0" r="5"/><title>S1 shot 4 &#183; 1.317 s</title></g>
+<g><circle class="dot" cx="62.0" cy="56.7" r="5"/><title>S1 shot 5 &#183; 1.367 s</title></g>
+<g><circle class="dot flag" cx="150.0" cy="127.3" r="5"/><title>S2 shot 1 &#183; 1.150 s &#183; FLAGGED</title></g>
+<path class="flagmark" d="M150.0,114.3 l4.5,8 l-9,0 z"/>
+<g><circle class="dot" cx="157.0" cy="62.2" r="5"/><title>S2 shot 2 &#183; 1.350 s</title></g>
+<g><circle class="dot" cx="157.0" cy="62.2" r="5"/><title>S2 shot 3 &#183; 1.350 s</title></g>
+<g><circle class="dot" cx="171.0" cy="73.0" r="5"/><title>S2 shot 4 &#183; 1.317 s</title></g>
+<g><circle class="dot" cx="178.0" cy="56.7" r="5"/><title>S2 shot 5 &#183; 1.367 s</title></g>
+<g><circle class="dot flag" cx="269.5" cy="127.3" r="5"/><title>S3 shot 1 &#183; 1.150 s &#183; FLAGGED</title></g>
+<path class="flagmark" d="M269.5,114.3 l4.5,8 l-9,0 z"/>
+<g><circle class="dot" cx="276.5" cy="62.2" r="5"/><title>S3 shot 2 &#183; 1.350 s</title></g>
+<g><circle class="dot" cx="276.5" cy="62.2" r="5"/><title>S3 shot 3 &#183; 1.350 s</title></g>
+<g><circle class="dot" cx="290.5" cy="73.0" r="5"/><title>S3 shot 4 &#183; 1.317 s</title></g>
+</svg><svg class="facet" viewBox="0 0 290 170" role="img" aria-label="Pre-draw">
+<text class="facet-title" x="0" y="13">Pre-draw</text>
+<text class="facet-sub" x="0" y="27">n=11 shots, pooled SD 0.048s</text>
+<line class="grid" x1="48" y1="126.0" x2="280" y2="126.0"/>
+<text class="tick" x="42" y="129.0" text-anchor="end">0.40</text>
+<line class="grid" x1="48" y1="67.4" x2="280" y2="67.4"/>
+<text class="tick" x="42" y="70.4" text-anchor="end">0.50</text>
+<text class="tick" x="46.0" y="160" text-anchor="start">S1</text>
+<text class="tick" x="164.0" y="160" text-anchor="middle">S2</text>
+<text class="tick" x="282.0" y="160" text-anchor="end">S3</text>
+<line class="mean" x1="48" y1="87.8" x2="280" y2="87.8"/>
+<path class="trend" d="M48.0,84.5 L164.0,84.5 L280.0,96.7"/>
+<g><circle class="dot" cx="37.5" cy="126.0" r="5"/><title>S1 shot 1 &#183; 0.400 s</title></g>
+<g><circle class="dot" cx="44.5" cy="86.7" r="5"/><title>S1 shot 2 &#183; 0.467 s</title></g>
+<g><circle class="dot" cx="51.5" cy="77.3" r="5"/><title>S1 shot 3 &#183; 0.483 s</title></g>
+<g><circle class="dot" cx="58.5" cy="48.0" r="5"/><title>S1 shot 5 &#183; 0.533 s</title></g>
+<g><circle class="dot" cx="153.5" cy="126.0" r="5"/><title>S2 shot 1 &#183; 0.400 s</title></g>
+<g><circle class="dot" cx="160.5" cy="86.7" r="5"/><title>S2 shot 2 &#183; 0.467 s</title></g>
+<g><circle class="dot" cx="167.5" cy="77.3" r="5"/><title>S2 shot 3 &#183; 0.483 s</title></g>
+<g><circle class="dot" cx="174.5" cy="48.0" r="5"/><title>S2 shot 5 &#183; 0.533 s</title></g>
+<g><circle class="dot" cx="273.0" cy="126.0" r="5"/><title>S3 shot 1 &#183; 0.400 s</title></g>
+<g><circle class="dot" cx="280.0" cy="86.7" r="5"/><title>S3 shot 2 &#183; 0.467 s</title></g>
+<g><circle class="dot" cx="287.0" cy="77.3" r="5"/><title>S3 shot 3 &#183; 0.483 s</title></g>
+</svg><svg class="facet" viewBox="0 0 290 170" role="img" aria-label="Draw">
+<text class="facet-title" x="0" y="13">Draw</text>
+<text class="facet-sub" x="0" y="27">n=14 shots, pooled SD 0.212s</text>
+<line class="grid" x1="48" y1="118.4" x2="280" y2="118.4"/>
+<text class="tick" x="42" y="121.4" text-anchor="end">0.50</text>
+<line class="grid" x1="48" y1="85.4" x2="280" y2="85.4"/>
+<text class="tick" x="42" y="88.4" text-anchor="end">0.75</text>
+<line class="grid" x1="48" y1="52.3" x2="280" y2="52.3"/>
+<text class="tick" x="42" y="55.3" text-anchor="end">1.00</text>
+<text class="tick" x="46.0" y="160" text-anchor="start">S1</text>
+<text class="tick" x="164.0" y="160" text-anchor="middle">S2</text>
+<text class="tick" x="282.0" y="160" text-anchor="end">S3</text>
+<line class="mean" x1="48" y1="107.4" x2="280" y2="107.4"/>
+<path class="trend" d="M48.0,108.7 L164.0,108.7 L280.0,104.1"/>
+<g><circle class="dot" cx="34.0" cy="111.8" r="5"/><title>S1 shot 1 &#183; 0.550 s</title></g>
+<g><circle class="dot" cx="41.0" cy="122.8" r="5"/><title>S1 shot 2 &#183; 0.467 s</title></g>
+<g><circle class="dot" cx="48.0" cy="125.0" r="5"/><title>S1 shot 3 &#183; 0.450 s</title></g>
+<g><circle class="dot flag" cx="55.0" cy="56.7" r="5"/><title>S1 shot 4 &#183; 0.967 s &#183; FLAGGED</title></g>
+<path class="flagmark" d="M55.0,43.7 l4.5,8 l-9,0 z"/>
+<g><circle class="dot" cx="62.0" cy="127.3" r="5"/><title>S1 shot 5 &#183; 0.433 s</title></g>
+<g><circle class="dot" cx="150.0" cy="111.8" r="5"/><title>S2 shot 1 &#183; 0.550 s</title></g>
+<g><circle class="dot" cx="157.0" cy="122.8" r="5"/><title>S2 shot 2 &#183; 0.467 s</title></g>
+<g><circle class="dot" cx="164.0" cy="125.0" r="5"/><title>S2 shot 3 &#183; 0.450 s</title></g>
+<g><circle class="dot flag" cx="171.0" cy="56.7" r="5"/><title>S2 shot 4 &#183; 0.967 s &#183; FLAGGED</title></g>
+<path class="flagmark" d="M171.0,43.7 l4.5,8 l-9,0 z"/>
+<g><circle class="dot" cx="178.0" cy="127.3" r="5"/><title>S2 shot 5 &#183; 0.433 s</title></g>
+<g><circle class="dot" cx="269.5" cy="111.8" r="5"/><title>S3 shot 1 &#183; 0.550 s</title></g>
+<g><circle class="dot" cx="276.5" cy="122.8" r="5"/><title>S3 shot 2 &#183; 0.467 s</title></g>
+<g><circle class="dot" cx="283.5" cy="125.0" r="5"/><title>S3 shot 3 &#183; 0.450 s</title></g>
+<g><circle class="dot flag" cx="290.5" cy="56.7" r="5"/><title>S3 shot 4 &#183; 0.967 s &#183; FLAGGED</title></g>
+<path class="flagmark" d="M290.5,43.7 l4.5,8 l-9,0 z"/>
+</svg><svg class="facet" viewBox="0 0 290 170" role="img" aria-label="Anchor">
+<text class="facet-title" x="0" y="13">Anchor</text>
+<text class="facet-sub" x="0" y="27">n=14 shots, pooled SD 0.036s</text>
+<line class="grid" x1="48" y1="115.3" x2="280" y2="115.3"/>
+<text class="tick" x="42" y="118.3" text-anchor="end">0.150</text>
+<line class="grid" x1="48" y1="80.0" x2="280" y2="80.0"/>
+<text class="tick" x="42" y="83.0" text-anchor="end">0.200</text>
+<line class="grid" x1="48" y1="44.7" x2="280" y2="44.7"/>
+<text class="tick" x="42" y="47.7" text-anchor="end">0.250</text>
+<text class="tick" x="46.0" y="160" text-anchor="start">S1</text>
+<text class="tick" x="164.0" y="160" text-anchor="middle">S2</text>
+<text class="tick" x="282.0" y="160" text-anchor="end">S3</text>
+<line class="mean" x1="48" y1="117.2" x2="280" y2="117.2"/>
+<path class="trend" d="M48.0,113.2 L164.0,113.2 L280.0,127.3"/>
+<g><circle class="dot" cx="34.0" cy="127.3" r="5"/><title>S1 shot 1 &#183; 0.133 s</title></g>
+<g><circle class="dot" cx="34.0" cy="127.3" r="5"/><title>S1 shot 2 &#183; 0.133 s</title></g>
+<g><circle class="dot" cx="34.0" cy="127.3" r="5"/><title>S1 shot 3 &#183; 0.133 s</title></g>
+<g><circle class="dot" cx="34.0" cy="127.3" r="5"/><title>S1 shot 4 &#183; 0.133 s</title></g>
+<g><circle class="dot flag" cx="62.0" cy="56.7" r="5"/><title>S1 shot 5 &#183; 0.233 s &#183; FLAGGED</title></g>
+<path class="flagmark" d="M62.0,43.7 l4.5,8 l-9,0 z"/>
+<g><circle class="dot" cx="150.0" cy="127.3" r="5"/><title>S2 shot 1 &#183; 0.133 s</title></g>
+<g><circle class="dot" cx="150.0" cy="127.3" r="5"/><title>S2 shot 2 &#183; 0.133 s</title></g>
+<g><circle class="dot" cx="150.0" cy="127.3" r="5"/><title>S2 shot 3 &#183; 0.133 s</title></g>
+<g><circle class="dot" cx="150.0" cy="127.3" r="5"/><title>S2 shot 4 &#183; 0.133 s</title></g>
+<g><circle class="dot flag" cx="178.0" cy="56.7" r="5"/><title>S2 shot 5 &#183; 0.233 s &#183; FLAGGED</title></g>
+<path class="flagmark" d="M178.0,43.7 l4.5,8 l-9,0 z"/>
+<g><circle class="dot" cx="269.5" cy="127.3" r="5"/><title>S3 shot 1 &#183; 0.133 s</title></g>
+<g><circle class="dot" cx="269.5" cy="127.3" r="5"/><title>S3 shot 2 &#183; 0.133 s</title></g>
+<g><circle class="dot" cx="269.5" cy="127.3" r="5"/><title>S3 shot 3 &#183; 0.133 s</title></g>
+<g><circle class="dot" cx="269.5" cy="127.3" r="5"/><title>S3 shot 4 &#183; 0.133 s</title></g>
+</svg><svg class="facet" viewBox="0 0 290 170" role="img" aria-label="Aim / Approach">
+<text class="facet-title" x="0" y="13">Aim / Approach</text>
+<text class="facet-sub" x="0" y="27">n=14 shots, pooled SD 0.202s</text>
+<line class="grid" x1="48" y1="119.6" x2="280" y2="119.6"/>
+<text class="tick" x="42" y="122.6" text-anchor="end">1.00</text>
+<line class="grid" x1="48" y1="73.4" x2="280" y2="73.4"/>
+<text class="tick" x="42" y="76.4" text-anchor="end">1.50</text>
+<text class="tick" x="46.0" y="160" text-anchor="start">S1</text>
+<text class="tick" x="164.0" y="160" text-anchor="middle">S2</text>
+<text class="tick" x="282.0" y="160" text-anchor="end">S3</text>
+<line class="mean" x1="48" y1="114.7" x2="280" y2="114.7"/>
+<path class="trend" d="M48.0,117.8 L164.0,106.1 L280.0,121.5"/>
+<g><circle class="dot" cx="34.0" cy="118.0" r="5"/><title>S1 shot 1 &#183; 1.017 s</title></g>
+<g><circle class="dot" cx="41.0" cy="115.0" r="5"/><title>S1 shot 2 &#183; 1.050 s</title></g>
+<g><circle class="dot" cx="48.0" cy="127.3" r="5"/><title>S1 shot 3 &#183; 0.917 s</title></g>
+<g><circle class="dot" cx="55.0" cy="125.8" r="5"/><title>S1 shot 4 &#183; 0.933 s</title></g>
+<g><circle class="dot" cx="62.0" cy="102.7" r="5"/><title>S1 shot 5 &#183; 1.183 s</title></g>
+<g><circle class="dot" cx="150.0" cy="118.0" r="5"/><title>S2 shot 1 &#183; 1.017 s</title></g>
+<g><circle class="dot flag" cx="157.0" cy="56.7" r="5"/><title>S2 shot 2 &#183; 1.680 s &#183; FLAGGED</title></g>
+<path class="flagmark" d="M157.0,43.7 l4.5,8 l-9,0 z"/>
+<g><circle class="dot" cx="164.0" cy="127.3" r="5"/><title>S2 shot 3 &#183; 0.917 s</title></g>
+<g><circle class="dot" cx="171.0" cy="125.8" r="5"/><title>S2 shot 4 &#183; 0.933 s</title></g>
+<g><circle class="dot" cx="178.0" cy="102.7" r="5"/><title>S2 shot 5 &#183; 1.183 s</title></g>
+<g><circle class="dot" cx="269.5" cy="118.0" r="5"/><title>S3 shot 1 &#183; 1.017 s</title></g>
+<g><circle class="dot" cx="276.5" cy="115.0" r="5"/><title>S3 shot 2 &#183; 1.050 s</title></g>
+<g><circle class="dot" cx="283.5" cy="127.3" r="5"/><title>S3 shot 3 &#183; 0.917 s</title></g>
+<g><circle class="dot" cx="290.5" cy="125.8" r="5"/><title>S3 shot 4 &#183; 0.933 s</title></g>
+</svg><svg class="facet" viewBox="0 0 290 170" role="img" aria-label="Expansion">
+<text class="facet-title" x="0" y="13">Expansion</text>
+<text class="facet-sub" x="0" y="27">n=12 shots, pooled SD 0.058s</text>
+<line class="grid" x1="48" y1="96.7" x2="280" y2="96.7"/>
+<text class="tick" x="42" y="99.7" text-anchor="end">0.30</text>
+<line class="grid" x1="48" y1="38.1" x2="280" y2="38.1"/>
+<text class="tick" x="42" y="41.1" text-anchor="end">0.40</text>
+<text class="tick" x="46.0" y="160" text-anchor="start">S1</text>
+<text class="tick" x="164.0" y="160" text-anchor="middle">S2</text>
+<text class="tick" x="282.0" y="160" text-anchor="end">S3</text>
+<line class="mean" x1="48" y1="84.5" x2="280" y2="84.5"/>
+<path class="trend" d="M48.0,84.5 L164.0,84.5 L280.0,84.5"/>
+<g><circle class="dot" cx="37.5" cy="106.6" r="5"/><title>S1 shot 1 &#183; 0.283 s</title></g>
+<g><circle class="dot" cx="44.5" cy="126.0" r="5"/><title>S1 shot 2 &#183; 0.250 s</title></g>
+<g><circle class="dot" cx="51.5" cy="48.0" r="5"/><title>S1 shot 3 &#183; 0.383 s</title></g>
+<g><circle class="dot" cx="58.5" cy="57.4" r="5"/><title>S1 shot 4 &#183; 0.367 s</title></g>
+<g><circle class="dot" cx="153.5" cy="106.6" r="5"/><title>S2 shot 1 &#183; 0.283 s</title></g>
+<g><circle class="dot" cx="160.5" cy="126.0" r="5"/><title>S2 shot 2 &#183; 0.250 s</title></g>
+<g><circle class="dot" cx="167.5" cy="48.0" r="5"/><title>S2 shot 3 &#183; 0.383 s</title></g>
+<g><circle class="dot" cx="174.5" cy="57.4" r="5"/><title>S2 shot 4 &#183; 0.367 s</title></g>
+<g><circle class="dot" cx="269.5" cy="106.6" r="5"/><title>S3 shot 1 &#183; 0.283 s</title></g>
+<g><circle class="dot" cx="276.5" cy="126.0" r="5"/><title>S3 shot 2 &#183; 0.250 s</title></g>
+<g><circle class="dot" cx="283.5" cy="48.0" r="5"/><title>S3 shot 3 &#183; 0.383 s</title></g>
+<g><circle class="dot" cx="290.5" cy="57.4" r="5"/><title>S3 shot 4 &#183; 0.367 s</title></g>
+</svg><svg class="facet flat" viewBox="0 0 290 170" role="img" aria-label="Release, identical in every shot"><text class="facet-title" x="0" y="13">Release</text><text class="facet-sub" x="0" y="27">n=14 shots, pooled SD 0.000s</text><text class="flatval" x="145" y="89" text-anchor="middle">0.083 s</text><text class="facet-sub" x="145" y="109" text-anchor="middle">identical in all 14 shots, no variation to chart</text></svg><svg class="facet flat" viewBox="0 0 290 170" role="img" aria-label="Follow-through, identical in every shot"><text class="facet-title" x="0" y="13">Follow-through</text><text class="facet-sub" x="0" y="27">n=14 shots, pooled SD 0.000s</text><text class="flatval" x="145" y="89" text-anchor="middle">0.600 s</text><text class="facet-sub" x="145" y="109" text-anchor="middle">identical in all 14 shots, no variation to chart</text></svg><svg class="facet" viewBox="0 0 290 170" role="img" aria-label="Recovery">
+<text class="facet-title" x="0" y="13">Recovery</text>
+<text class="facet-sub" x="0" y="27">n=14 shots, pooled SD 0.014s</text>
+<line class="grid" x1="48" y1="99.5" x2="280" y2="99.5"/>
+<text class="tick" x="42" y="102.5" text-anchor="end">0.580</text>
+<line class="grid" x1="48" y1="56.7" x2="280" y2="56.7"/>
+<text class="tick" x="42" y="59.7" text-anchor="end">0.600</text>
+<text class="tick" x="46.0" y="160" text-anchor="start">S1</text>
+<text class="tick" x="164.0" y="160" text-anchor="middle">S2</text>
+<text class="tick" x="282.0" y="160" text-anchor="end">S3</text>
+<line class="mean" x1="48" y1="71.8" x2="280" y2="71.8"/>
+<path class="trend" d="M48.0,70.8 L164.0,70.8 L280.0,74.4"/>
+<g><circle class="dot" cx="34.0" cy="56.7" r="5"/><title>S1 shot 1 &#183; 0.600 s</title></g>
+<g><circle class="dot" cx="34.0" cy="56.7" r="5"/><title>S1 shot 2 &#183; 0.600 s</title></g>
+<g><circle class="dot" cx="34.0" cy="56.7" r="5"/><title>S1 shot 3 &#183; 0.600 s</title></g>
+<g><circle class="dot flag" cx="55.0" cy="127.3" r="5"/><title>S1 shot 4 &#183; 0.567 s &#183; FLAGGED</title></g>
+<path class="flagmark" d="M55.0,114.3 l4.5,8 l-9,0 z"/>
+<g><circle class="dot" cx="34.0" cy="56.7" r="5"/><title>S1 shot 5 &#183; 0.600 s</title></g>
+<g><circle class="dot" cx="150.0" cy="56.7" r="5"/><title>S2 shot 1 &#183; 0.600 s</title></g>
+<g><circle class="dot" cx="150.0" cy="56.7" r="5"/><title>S2 shot 2 &#183; 0.600 s</title></g>
+<g><circle class="dot" cx="150.0" cy="56.7" r="5"/><title>S2 shot 3 &#183; 0.600 s</title></g>
+<g><circle class="dot flag" cx="171.0" cy="127.3" r="5"/><title>S2 shot 4 &#183; 0.567 s &#183; FLAGGED</title></g>
+<path class="flagmark" d="M171.0,114.3 l4.5,8 l-9,0 z"/>
+<g><circle class="dot" cx="150.0" cy="56.7" r="5"/><title>S2 shot 5 &#183; 0.600 s</title></g>
+<g><circle class="dot" cx="269.5" cy="56.7" r="5"/><title>S3 shot 1 &#183; 0.600 s</title></g>
+<g><circle class="dot" cx="269.5" cy="56.7" r="5"/><title>S3 shot 2 &#183; 0.600 s</title></g>
+<g><circle class="dot" cx="269.5" cy="56.7" r="5"/><title>S3 shot 3 &#183; 0.600 s</title></g>
+<g><circle class="dot flag" cx="290.5" cy="127.3" r="5"/><title>S3 shot 4 &#183; 0.567 s &#183; FLAGGED</title></g>
+<path class="flagmark" d="M290.5,114.3 l4.5,8 l-9,0 z"/>
+</svg></div>
+</section>
+
+<section>
+  <h2>Shots outside the athlete’s own range</h2>
+  
+  <table><tr><th>Shot</th><th>Phase</th><th>Duration</th><th>Baseline mean</th>
+    <th>Baseline SD</th><th>n others</th><th>z</th><th></th><th>Boundary</th></tr>
+  <tr><td>S2 shot 2</td>
+    <td>Aim / Approach</td><td class="num">1.680 s</td>
+    <td class="num">1.005 s</td>
+    <td class="num">0.094 s</td>
+    <td class="num">13</td><td class="num">+7.16</td>
+    <td>slower</td>
+    <td><span class="chip c-HIGH">HIGH</span></td></tr><tr><td>S1 shot 5</td>
+    <td>Anchor</td><td class="num">0.233 s</td>
+    <td class="num">0.141 s</td>
+    <td class="num">0.028 s</td>
+    <td class="num">13</td><td class="num">+3.33</td>
+    <td>slower</td>
+    <td><span class="chip c-HIGH">HIGH</span></td></tr><tr><td>S2 shot 5</td>
+    <td>Anchor</td><td class="num">0.233 s</td>
+    <td class="num">0.141 s</td>
+    <td class="num">0.028 s</td>
+    <td class="num">13</td><td class="num">+3.33</td>
+    <td>slower</td>
+    <td><span class="chip c-HIGH">HIGH</span></td></tr><tr><td>S1 shot 4</td>
+    <td>Recovery</td><td class="num">0.567 s</td>
+    <td class="num">0.595 s</td>
+    <td class="num">0.012 s</td>
+    <td class="num">13</td><td class="num">-2.25</td>
+    <td>faster</td>
+    <td><span class="chip c-HIGH">HIGH</span></td></tr><tr><td>S2 shot 4</td>
+    <td>Recovery</td><td class="num">0.567 s</td>
+    <td class="num">0.595 s</td>
+    <td class="num">0.012 s</td>
+    <td class="num">13</td><td class="num">-2.25</td>
+    <td>faster</td>
+    <td><span class="chip c-HIGH">HIGH</span></td></tr><tr><td>S3 shot 4</td>
+    <td>Recovery</td><td class="num">0.567 s</td>
+    <td class="num">0.595 s</td>
+    <td class="num">0.012 s</td>
+    <td class="num">13</td><td class="num">-2.25</td>
+    <td>faster</td>
+    <td><span class="chip c-HIGH">HIGH</span></td></tr><tr><td>S1 shot 1</td>
+    <td>Stance / Setup</td><td class="num">1.150 s</td>
+    <td class="num">1.314 s</td>
+    <td class="num">0.075 s</td>
+    <td class="num">13</td><td class="num">-2.19</td>
+    <td>faster</td>
+    <td><span class="chip c-HIGH">HIGH</span></td></tr><tr><td>S1 shot 4</td>
+    <td>Draw</td><td class="num">0.967 s</td>
+    <td class="num">0.554 s</td>
+    <td class="num">0.188 s</td>
+    <td class="num">13</td><td class="num">+2.19</td>
+    <td>slower</td>
+    <td><span class="chip c-MEDIUM">MEDIUM</span></td></tr><tr><td>S2 shot 1</td>
+    <td>Stance / Setup</td><td class="num">1.150 s</td>
+    <td class="num">1.314 s</td>
+    <td class="num">0.075 s</td>
+    <td class="num">13</td><td class="num">-2.19</td>
+    <td>faster</td>
+    <td><span class="chip c-HIGH">HIGH</span></td></tr><tr><td>S2 shot 4</td>
+    <td>Draw</td><td class="num">0.967 s</td>
+    <td class="num">0.554 s</td>
+    <td class="num">0.188 s</td>
+    <td class="num">13</td><td class="num">+2.19</td>
+    <td>slower</td>
+    <td><span class="chip c-MEDIUM">MEDIUM</span></td></tr><tr><td>S3 shot 1</td>
+    <td>Stance / Setup</td><td class="num">1.150 s</td>
+    <td class="num">1.314 s</td>
+    <td class="num">0.075 s</td>
+    <td class="num">13</td><td class="num">-2.19</td>
+    <td>faster</td>
+    <td><span class="chip c-HIGH">HIGH</span></td></tr><tr><td>S3 shot 4</td>
+    <td>Draw</td><td class="num">0.967 s</td>
+    <td class="num">0.554 s</td>
+    <td class="num">0.188 s</td>
+    <td class="num">13</td><td class="num">+2.19</td>
+    <td>slower</td>
+    <td><span class="chip c-MEDIUM">MEDIUM</span></td></tr>
+  </table>
+  <p class="cap">Ranked by how far the shot sits from the rest, largest first. A LOW
+  boundary confidence means the phase edge itself was hard to place, so the deviation
+  rests on a soft measurement and should be checked against the annotated video before
+  it is acted on.</p>
+  
+</section>
+
+
+<section>
+  <h2>Positions over time</h2>
+  <p class="cap">Measured at each shot's aim key frame. Drawn only where two or more
+  sessions share a camera view.</p>
+  <div class="facets"><svg class="facet" viewBox="0 0 290 170" role="img" aria-label="Bow elbow angle">
+<text class="facet-title" x="0" y="13">Bow elbow angle</text>
+<text class="facet-sub" x="0" y="27">view: side-on (bow-arm side) &amp;#183; n=14 shots</text>
+<line class="grid" x1="48" y1="120.4" x2="280" y2="120.4"/>
+<text class="tick" x="42" y="123.4" text-anchor="end">168</text>
+<line class="grid" x1="48" y1="64.7" x2="280" y2="64.7"/>
+<text class="tick" x="42" y="67.7" text-anchor="end">169</text>
+<text class="tick" x="46.0" y="160" text-anchor="start">S1</text>
+<text class="tick" x="164.0" y="160" text-anchor="middle">S2</text>
+<text class="tick" x="282.0" y="160" text-anchor="end">S3</text>
+<line class="mean" x1="48" y1="98.1" x2="280" y2="98.1"/>
+<path class="trend" d="M48.0,99.2 L164.0,99.2 L280.0,95.4"/>
+<g><circle class="dot" cx="34.0" cy="48.0" r="5"/><title>S1 shot 1 &#183; 169.300 deg</title></g>
+<g><circle class="dot" cx="41.0" cy="98.1" r="5"/><title>S1 shot 2 &#183; 168.400 deg</title></g>
+<g><circle class="dot" cx="48.0" cy="126.0" r="5"/><title>S1 shot 3 &#183; 167.900 deg</title></g>
+<g><circle class="dot" cx="55.0" cy="109.3" r="5"/><title>S1 shot 4 &#183; 168.200 deg</title></g>
+<g><circle class="dot" cx="62.0" cy="114.8" r="5"/><title>S1 shot 5 &#183; 168.100 deg</title></g>
+<g><circle class="dot" cx="150.0" cy="48.0" r="5"/><title>S2 shot 1 &#183; 169.300 deg</title></g>
+<g><circle class="dot" cx="157.0" cy="98.1" r="5"/><title>S2 shot 2 &#183; 168.400 deg</title></g>
+<g><circle class="dot" cx="164.0" cy="126.0" r="5"/><title>S2 shot 3 &#183; 167.900 deg</title></g>
+<g><circle class="dot" cx="171.0" cy="109.3" r="5"/><title>S2 shot 4 &#183; 168.200 deg</title></g>
+<g><circle class="dot" cx="178.0" cy="114.8" r="5"/><title>S2 shot 5 &#183; 168.100 deg</title></g>
+<g><circle class="dot" cx="269.5" cy="48.0" r="5"/><title>S3 shot 1 &#183; 169.300 deg</title></g>
+<g><circle class="dot" cx="276.5" cy="98.1" r="5"/><title>S3 shot 2 &#183; 168.400 deg</title></g>
+<g><circle class="dot" cx="283.5" cy="126.0" r="5"/><title>S3 shot 3 &#183; 167.900 deg</title></g>
+<g><circle class="dot" cx="290.5" cy="109.3" r="5"/><title>S3 shot 4 &#183; 168.200 deg</title></g>
+</svg><svg class="facet" viewBox="0 0 290 170" role="img" aria-label="Draw elbow angle">
+<text class="facet-title" x="0" y="13">Draw elbow angle</text>
+<text class="facet-sub" x="0" y="27">view: side-on (bow-arm side) &amp;#183; n=14 shots</text>
+<line class="grid" x1="48" y1="119.7" x2="280" y2="119.7"/>
+<text class="tick" x="42" y="122.7" text-anchor="end">40</text>
+<line class="grid" x1="48" y1="57.4" x2="280" y2="57.4"/>
+<text class="tick" x="42" y="60.4" text-anchor="end">42</text>
+<text class="tick" x="46.0" y="160" text-anchor="start">S1</text>
+<text class="tick" x="164.0" y="160" text-anchor="middle">S2</text>
+<text class="tick" x="282.0" y="160" text-anchor="end">S3</text>
+<line class="mean" x1="48" y1="82.8" x2="280" y2="82.8"/>
+<path class="trend" d="M48.0,80.5 L164.0,80.5 L280.0,88.6"/>
+<g><circle class="dot" cx="34.0" cy="57.4" r="5"/><title>S1 shot 1 &#183; 42.000 deg</title></g>
+<g><circle class="dot" cx="41.0" cy="60.5" r="5"/><title>S1 shot 2 &#183; 41.900 deg</title></g>
+<g><circle class="dot" cx="48.0" cy="110.4" r="5"/><title>S1 shot 3 &#183; 40.300 deg</title></g>
+<g><circle class="dot" cx="55.0" cy="126.0" r="5"/><title>S1 shot 4 &#183; 39.800 deg</title></g>
+<g><circle class="dot" cx="62.0" cy="48.0" r="5"/><title>S1 shot 5 &#183; 42.300 deg</title></g>
+<g><circle class="dot" cx="150.0" cy="57.4" r="5"/><title>S2 shot 1 &#183; 42.000 deg</title></g>
+<g><circle class="dot" cx="157.0" cy="60.5" r="5"/><title>S2 shot 2 &#183; 41.900 deg</title></g>
+<g><circle class="dot" cx="164.0" cy="110.4" r="5"/><title>S2 shot 3 &#183; 40.300 deg</title></g>
+<g><circle class="dot" cx="171.0" cy="126.0" r="5"/><title>S2 shot 4 &#183; 39.800 deg</title></g>
+<g><circle class="dot" cx="178.0" cy="48.0" r="5"/><title>S2 shot 5 &#183; 42.300 deg</title></g>
+<g><circle class="dot" cx="269.5" cy="57.4" r="5"/><title>S3 shot 1 &#183; 42.000 deg</title></g>
+<g><circle class="dot" cx="276.5" cy="60.5" r="5"/><title>S3 shot 2 &#183; 41.900 deg</title></g>
+<g><circle class="dot" cx="283.5" cy="110.4" r="5"/><title>S3 shot 3 &#183; 40.300 deg</title></g>
+<g><circle class="dot" cx="290.5" cy="126.0" r="5"/><title>S3 shot 4 &#183; 39.800 deg</title></g>
+</svg><svg class="facet" viewBox="0 0 290 170" role="img" aria-label="Bow shoulder angle">
+<text class="facet-title" x="0" y="13">Bow shoulder angle</text>
+<text class="facet-sub" x="0" y="27">view: side-on (bow-arm side) &amp;#183; n=14 shots</text>
+<line class="grid" x1="48" y1="138.0" x2="280" y2="138.0"/>
+<text class="tick" x="42" y="141.0" text-anchor="end">89</text>
+<line class="grid" x1="48" y1="78.0" x2="280" y2="78.0"/>
+<text class="tick" x="42" y="81.0" text-anchor="end">90</text>
+<text class="tick" x="46.0" y="160" text-anchor="start">S1</text>
+<text class="tick" x="164.0" y="160" text-anchor="middle">S2</text>
+<text class="tick" x="282.0" y="160" text-anchor="end">S3</text>
+<line class="mean" x1="48" y1="87.9" x2="280" y2="87.9"/>
+<path class="trend" d="M48.0,87.6 L164.0,87.6 L280.0,88.5"/>
+<g><circle class="dot" cx="34.0" cy="48.0" r="5"/><title>S1 shot 1 &#183; 90.500 deg</title></g>
+<g><circle class="dot" cx="41.0" cy="126.0" r="5"/><title>S1 shot 2 &#183; 89.200 deg</title></g>
+<g><circle class="dot" cx="48.0" cy="120.0" r="5"/><title>S1 shot 3 &#183; 89.300 deg</title></g>
+<g><circle class="dot" cx="55.0" cy="60.0" r="5"/><title>S1 shot 4 &#183; 90.300 deg</title></g>
+<g><circle class="dot" cx="62.0" cy="84.0" r="5"/><title>S1 shot 5 &#183; 89.900 deg</title></g>
+<g><circle class="dot" cx="150.0" cy="48.0" r="5"/><title>S2 shot 1 &#183; 90.500 deg</title></g>
+<g><circle class="dot" cx="157.0" cy="126.0" r="5"/><title>S2 shot 2 &#183; 89.200 deg</title></g>
+<g><circle class="dot" cx="164.0" cy="120.0" r="5"/><title>S2 shot 3 &#183; 89.300 deg</title></g>
+<g><circle class="dot" cx="171.0" cy="60.0" r="5"/><title>S2 shot 4 &#183; 90.300 deg</title></g>
+<g><circle class="dot" cx="178.0" cy="84.0" r="5"/><title>S2 shot 5 &#183; 89.900 deg</title></g>
+<g><circle class="dot" cx="269.5" cy="48.0" r="5"/><title>S3 shot 1 &#183; 90.500 deg</title></g>
+<g><circle class="dot" cx="276.5" cy="126.0" r="5"/><title>S3 shot 2 &#183; 89.200 deg</title></g>
+<g><circle class="dot" cx="283.5" cy="120.0" r="5"/><title>S3 shot 3 &#183; 89.300 deg</title></g>
+<g><circle class="dot" cx="290.5" cy="60.0" r="5"/><title>S3 shot 4 &#183; 90.300 deg</title></g>
+</svg><svg class="facet" viewBox="0 0 290 170" role="img" aria-label="Draw shoulder angle">
+<text class="facet-title" x="0" y="13">Draw shoulder angle</text>
+<text class="facet-sub" x="0" y="27">view: side-on (bow-arm side) &amp;#183; n=14 shots</text>
+<line class="grid" x1="48" y1="134.3" x2="280" y2="134.3"/>
+<text class="tick" x="42" y="137.3" text-anchor="end">132</text>
+<line class="grid" x1="48" y1="78.6" x2="280" y2="78.6"/>
+<text class="tick" x="42" y="81.6" text-anchor="end">134</text>
+<text class="tick" x="46.0" y="160" text-anchor="start">S1</text>
+<text class="tick" x="164.0" y="160" text-anchor="middle">S2</text>
+<text class="tick" x="282.0" y="160" text-anchor="end">S3</text>
+<line class="mean" x1="48" y1="89.8" x2="280" y2="89.8"/>
+<path class="trend" d="M48.0,87.0 L164.0,87.0 L280.0,96.7"/>
+<g><circle class="dot" cx="34.0" cy="61.9" r="5"/><title>S1 shot 1 &#183; 134.600 deg</title></g>
+<g><circle class="dot" cx="41.0" cy="117.6" r="5"/><title>S1 shot 2 &#183; 132.600 deg</title></g>
+<g><circle class="dot" cx="48.0" cy="126.0" r="5"/><title>S1 shot 3 &#183; 132.300 deg</title></g>
+<g><circle class="dot" cx="55.0" cy="81.4" r="5"/><title>S1 shot 4 &#183; 133.900 deg</title></g>
+<g><circle class="dot" cx="62.0" cy="48.0" r="5"/><title>S1 shot 5 &#183; 135.100 deg</title></g>
+<g><circle class="dot" cx="150.0" cy="61.9" r="5"/><title>S2 shot 1 &#183; 134.600 deg</title></g>
+<g><circle class="dot" cx="157.0" cy="117.6" r="5"/><title>S2 shot 2 &#183; 132.600 deg</title></g>
+<g><circle class="dot" cx="164.0" cy="126.0" r="5"/><title>S2 shot 3 &#183; 132.300 deg</title></g>
+<g><circle class="dot" cx="171.0" cy="81.4" r="5"/><title>S2 shot 4 &#183; 133.900 deg</title></g>
+<g><circle class="dot" cx="178.0" cy="48.0" r="5"/><title>S2 shot 5 &#183; 135.100 deg</title></g>
+<g><circle class="dot" cx="269.5" cy="61.9" r="5"/><title>S3 shot 1 &#183; 134.600 deg</title></g>
+<g><circle class="dot" cx="276.5" cy="117.6" r="5"/><title>S3 shot 2 &#183; 132.600 deg</title></g>
+<g><circle class="dot" cx="283.5" cy="126.0" r="5"/><title>S3 shot 3 &#183; 132.300 deg</title></g>
+<g><circle class="dot" cx="290.5" cy="81.4" r="5"/><title>S3 shot 4 &#183; 133.900 deg</title></g>
+</svg><svg class="facet" viewBox="0 0 290 170" role="img" aria-label="Trunk inclination">
+<text class="facet-title" x="0" y="13">Trunk inclination</text>
+<text class="facet-sub" x="0" y="27">view: side-on (bow-arm side) &amp;#183; n=14 shots</text>
+<line class="grid" x1="48" y1="126.0" x2="280" y2="126.0"/>
+<text class="tick" x="42" y="129.0" text-anchor="end">0.00</text>
+<line class="grid" x1="48" y1="87.0" x2="280" y2="87.0"/>
+<text class="tick" x="42" y="90.0" text-anchor="end">0.25</text>
+<line class="grid" x1="48" y1="48.0" x2="280" y2="48.0"/>
+<text class="tick" x="42" y="51.0" text-anchor="end">0.50</text>
+<text class="tick" x="46.0" y="160" text-anchor="start">S1</text>
+<text class="tick" x="164.0" y="160" text-anchor="middle">S2</text>
+<text class="tick" x="282.0" y="160" text-anchor="end">S3</text>
+<line class="mean" x1="48" y1="92.6" x2="280" y2="92.6"/>
+<path class="trend" d="M48.0,91.7 L164.0,91.7 L280.0,94.8"/>
+<g><circle class="dot" cx="34.0" cy="94.8" r="5"/><title>S1 shot 1 &#183; 0.200 deg</title></g>
+<g><circle class="dot" cx="41.0" cy="110.4" r="5"/><title>S1 shot 2 &#183; 0.100 deg</title></g>
+<g><circle class="dot" cx="48.0" cy="126.0" r="5"/><title>S1 shot 3 &#183; 0.000 deg</title></g>
+<g><circle class="dot" cx="55.0" cy="48.0" r="5"/><title>S1 shot 4 &#183; 0.500 deg</title></g>
+<g><circle class="dot" cx="62.0" cy="79.2" r="5"/><title>S1 shot 5 &#183; 0.300 deg</title></g>
+<g><circle class="dot" cx="150.0" cy="94.8" r="5"/><title>S2 shot 1 &#183; 0.200 deg</title></g>
+<g><circle class="dot" cx="157.0" cy="110.4" r="5"/><title>S2 shot 2 &#183; 0.100 deg</title></g>
+<g><circle class="dot" cx="164.0" cy="126.0" r="5"/><title>S2 shot 3 &#183; 0.000 deg</title></g>
+<g><circle class="dot" cx="171.0" cy="48.0" r="5"/><title>S2 shot 4 &#183; 0.500 deg</title></g>
+<g><circle class="dot" cx="178.0" cy="79.2" r="5"/><title>S2 shot 5 &#183; 0.300 deg</title></g>
+<g><circle class="dot" cx="269.5" cy="94.8" r="5"/><title>S3 shot 1 &#183; 0.200 deg</title></g>
+<g><circle class="dot" cx="276.5" cy="110.4" r="5"/><title>S3 shot 2 &#183; 0.100 deg</title></g>
+<g><circle class="dot" cx="283.5" cy="126.0" r="5"/><title>S3 shot 3 &#183; 0.000 deg</title></g>
+<g><circle class="dot" cx="290.5" cy="48.0" r="5"/><title>S3 shot 4 &#183; 0.500 deg</title></g>
+</svg><svg class="facet" viewBox="0 0 290 170" role="img" aria-label="Anchor distance">
+<text class="facet-title" x="0" y="13">Anchor distance</text>
+<text class="facet-sub" x="0" y="27">scale-normalised, comparable across views &amp;#183; n=14 shots</text>
+<line class="grid" x1="48" y1="108.7" x2="280" y2="108.7"/>
+<text class="tick" x="42" y="111.7" text-anchor="end">0.325</text>
+<line class="grid" x1="48" y1="72.6" x2="280" y2="72.6"/>
+<text class="tick" x="42" y="75.6" text-anchor="end">0.350</text>
+<line class="grid" x1="48" y1="36.5" x2="280" y2="36.5"/>
+<text class="tick" x="42" y="39.5" text-anchor="end">0.375</text>
+<text class="tick" x="46.0" y="160" text-anchor="start">S1</text>
+<text class="tick" x="164.0" y="160" text-anchor="middle">S2</text>
+<text class="tick" x="282.0" y="160" text-anchor="end">S3</text>
+<line class="mean" x1="48" y1="80.2" x2="280" y2="80.2"/>
+<path class="trend" d="M48.0,83.2 L164.0,83.2 L280.0,72.6"/>
+<g><circle class="dot" cx="34.0" cy="92.8" r="5"/><title>S1 shot 1 &#183; 0.336 SW</title></g>
+<g><circle class="dot" cx="41.0" cy="52.4" r="5"/><title>S1 shot 2 &#183; 0.364 SW</title></g>
+<g><circle class="dot" cx="48.0" cy="48.0" r="5"/><title>S1 shot 3 &#183; 0.367 SW</title></g>
+<g><circle class="dot" cx="55.0" cy="97.1" r="5"/><title>S1 shot 4 &#183; 0.333 SW</title></g>
+<g><circle class="dot" cx="62.0" cy="126.0" r="5"/><title>S1 shot 5 &#183; 0.313 SW</title></g>
+<g><circle class="dot" cx="150.0" cy="92.8" r="5"/><title>S2 shot 1 &#183; 0.336 SW</title></g>
+<g><circle class="dot" cx="157.0" cy="52.4" r="5"/><title>S2 shot 2 &#183; 0.364 SW</title></g>
+<g><circle class="dot" cx="164.0" cy="48.0" r="5"/><title>S2 shot 3 &#183; 0.367 SW</title></g>
+<g><circle class="dot" cx="171.0" cy="97.1" r="5"/><title>S2 shot 4 &#183; 0.333 SW</title></g>
+<g><circle class="dot" cx="178.0" cy="126.0" r="5"/><title>S2 shot 5 &#183; 0.313 SW</title></g>
+<g><circle class="dot" cx="269.5" cy="92.8" r="5"/><title>S3 shot 1 &#183; 0.336 SW</title></g>
+<g><circle class="dot" cx="276.5" cy="52.4" r="5"/><title>S3 shot 2 &#183; 0.364 SW</title></g>
+<g><circle class="dot" cx="283.5" cy="48.0" r="5"/><title>S3 shot 3 &#183; 0.367 SW</title></g>
+<g><circle class="dot" cx="290.5" cy="97.1" r="5"/><title>S3 shot 4 &#183; 0.333 SW</title></g>
+</svg></div>
+  
+</section>
+
+
+<section>
+  <h2>Every value behind the charts</h2>
+  <p class="cap">The table view of the same data, for reading without colour and for
+  checking a chart against a number.</p>
+  <table><tr><th>Shot</th><th>Session</th>
+    <th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th>
+    <th>Total</th></tr>
+  <tr><td>S1 shot 1</td><td>S1</td>
+    
+    <td class="num">1.150</td><td class="num">0.400</td><td class="num">0.550</td><td class="num">0.133</td><td class="num">1.017</td><td class="num">0.283</td><td class="num">0.083</td><td class="num">0.600</td><td class="num">0.600</td>
+    <td class="num">4.816</td></tr><tr><td>S1 shot 2</td><td>S1</td>
+    
+    <td class="num">1.350</td><td class="num">0.467</td><td class="num">0.467</td><td class="num">0.133</td><td class="num">1.050</td><td class="num">0.250</td><td class="num">0.083</td><td class="num">0.600</td><td class="num">0.600</td>
+    <td class="num">5.000</td></tr><tr><td>S1 shot 3</td><td>S1</td>
+    
+    <td class="num">1.350</td><td class="num">0.483</td><td class="num">0.450</td><td class="num">0.133</td><td class="num">0.917</td><td class="num">0.383</td><td class="num">0.083</td><td class="num">0.600</td><td class="num">0.600</td>
+    <td class="num">4.999</td></tr><tr><td>S1 shot 4</td><td>S1</td>
+    
+    <td class="num">1.317</td><td class="num"><span class="na">not detected</span></td><td class="num">0.967</td><td class="num">0.133</td><td class="num">0.933</td><td class="num">0.367</td><td class="num">0.083</td><td class="num">0.600</td><td class="num">0.567</td>
+    <td class="num">4.967</td></tr><tr><td>S1 shot 5</td><td>S1</td>
+    
+    <td class="num">1.367</td><td class="num">0.533</td><td class="num">0.433</td><td class="num">0.233</td><td class="num">1.183</td><td class="num"><span class="na">not detected</span></td><td class="num">0.083</td><td class="num">0.600</td><td class="num">0.600</td>
+    <td class="num">5.032</td></tr><tr><td>S2 shot 1</td><td>S2</td>
+    
+    <td class="num">1.150</td><td class="num">0.400</td><td class="num">0.550</td><td class="num">0.133</td><td class="num">1.017</td><td class="num">0.283</td><td class="num">0.083</td><td class="num">0.600</td><td class="num">0.600</td>
+    <td class="num">4.816</td></tr><tr><td>S2 shot 2</td><td>S2</td>
+    
+    <td class="num">1.350</td><td class="num">0.467</td><td class="num">0.467</td><td class="num">0.133</td><td class="num">1.680</td><td class="num">0.250</td><td class="num">0.083</td><td class="num">0.600</td><td class="num">0.600</td>
+    <td class="num">5.630</td></tr><tr><td>S2 shot 3</td><td>S2</td>
+    
+    <td class="num">1.350</td><td class="num">0.483</td><td class="num">0.450</td><td class="num">0.133</td><td class="num">0.917</td><td class="num">0.383</td><td class="num">0.083</td><td class="num">0.600</td><td class="num">0.600</td>
+    <td class="num">4.999</td></tr><tr><td>S2 shot 4</td><td>S2</td>
+    
+    <td class="num">1.317</td><td class="num"><span class="na">not detected</span></td><td class="num">0.967</td><td class="num">0.133</td><td class="num">0.933</td><td class="num">0.367</td><td class="num">0.083</td><td class="num">0.600</td><td class="num">0.567</td>
+    <td class="num">4.967</td></tr><tr><td>S2 shot 5</td><td>S2</td>
+    
+    <td class="num">1.367</td><td class="num">0.533</td><td class="num">0.433</td><td class="num">0.233</td><td class="num">1.183</td><td class="num"><span class="na">not detected</span></td><td class="num">0.083</td><td class="num">0.600</td><td class="num">0.600</td>
+    <td class="num">5.032</td></tr><tr><td>S3 shot 1</td><td>S3</td>
+    
+    <td class="num">1.150</td><td class="num">0.400</td><td class="num">0.550</td><td class="num">0.133</td><td class="num">1.017</td><td class="num">0.283</td><td class="num">0.083</td><td class="num">0.600</td><td class="num">0.600</td>
+    <td class="num">4.816</td></tr><tr><td>S3 shot 2</td><td>S3</td>
+    
+    <td class="num">1.350</td><td class="num">0.467</td><td class="num">0.467</td><td class="num">0.133</td><td class="num">1.050</td><td class="num">0.250</td><td class="num">0.083</td><td class="num">0.600</td><td class="num">0.600</td>
+    <td class="num">5.000</td></tr><tr><td>S3 shot 3</td><td>S3</td>
+    
+    <td class="num">1.350</td><td class="num">0.483</td><td class="num">0.450</td><td class="num">0.133</td><td class="num">0.917</td><td class="num">0.383</td><td class="num">0.083</td><td class="num">0.600</td><td class="num">0.600</td>
+    <td class="num">4.999</td></tr><tr><td>S3 shot 4</td><td>S3</td>
+    
+    <td class="num">1.317</td><td class="num"><span class="na">not detected</span></td><td class="num">0.967</td><td class="num">0.133</td><td class="num">0.933</td><td class="num">0.367</td><td class="num">0.083</td><td class="num">0.600</td><td class="num">0.567</td>
+    <td class="num">4.967</td></tr>
+  </table>
+  <p class="cap">Durations in seconds. Badges: <b>1</b> Stance / Setup, <b>2</b> Pre-draw, <b>3</b> Draw, <b>4</b> Anchor, <b>5</b> Aim / Approach, <b>6</b> Expansion, <b>7</b> Release, <b>8</b> Follow-through, <b>9</b> Recovery.</p>
+
+  <h3>Provenance</h3>
+  <div class="kv"><div>Runs compared</div><div>Kalapna__aug13, Kalapna__aug20, Kalapna__aug27</div><div>Deviation threshold</div><div>2.0 SD, leave-one-out</div><div>Minimum shots for an SD</div><div>3</div><div>Evidence file</div><div>/sessions/rcw-011hpbkthhgsnev68jxqsljh/tmp/tmpm3_jqyv6/ev/compare_evidence.json</div><div>Pipeline version</div><div>0.1.0</div><div>Model calls</div><div>none: this report is computed, not written</div></div>
+</section>
+
+<footer>Generated by the SAI archery biomechanics pipeline &middot; read-only over finished runs</footer>
+</main>
+</body>
+</html>

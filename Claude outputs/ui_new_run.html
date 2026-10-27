@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Analyse a video - SAI Archery</title>
+<style>
+:root{--ink:#1d2330;--muted:#5d6678;--line:#dfe3ea;--bg:#f6f7fa;--card:#fff;--accent:#1f4e79;
+--hi:#1e7d4f;--me:#b7791f;--lo:#b8322a;--chip:#eef1f6;--run:#2a78d6}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+color:var(--ink);background:var(--bg)}
+header.top{background:linear-gradient(120deg,#12324f,#1f4e79);color:#fff;padding:18px 28px;
+display:flex;align-items:baseline;gap:22px;flex-wrap:wrap}
+header.top h1{margin:0;font-size:19px;letter-spacing:.3px;font-weight:650}
+header.top nav a{color:#cfe0f0;text-decoration:none;font-size:14px;margin-right:16px}
+header.top nav a:hover,header.top nav a.on{color:#fff;text-decoration:underline}
+header.top .right{margin-left:auto;font-size:12.5px;opacity:.8}
+main{max-width:1180px;margin:0 auto;padding:18px 16px 60px}
+section{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px 22px;margin:16px 0}
+h2{margin:0 0 10px;font-size:18px;color:var(--accent);border-bottom:2px solid var(--line);padding-bottom:7px}
+h3{font-size:15px;margin:18px 0 6px}
+table{border-collapse:collapse;width:100%;margin:8px 0 12px;font-size:13.5px}
+th,td{border:1px solid var(--line);padding:6px 9px;text-align:left;vertical-align:middle}
+th{background:var(--chip);font-weight:600}
+td.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+a{color:var(--accent)}
+.btn{display:inline-block;background:var(--accent);color:#fff;border:0;border-radius:7px;
+padding:8px 15px;font:inherit;font-size:14px;cursor:pointer;text-decoration:none}
+.btn:hover{background:#17405f}
+.btn.sm{padding:4px 10px;font-size:12.5px}
+.btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--line)}
+.btn.warn{background:var(--lo)}
+.btn[disabled]{background:#aab;cursor:not-allowed}
+.chip{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;background:var(--chip);color:#334}
+.s-DONE{background:#e3f4ec;color:var(--hi)}.s-RUNNING{background:#e4eefb;color:var(--run)}
+.s-FAILED{background:#fbe6e4;color:var(--lo)}.s-PENDING{background:#eef1f6;color:#667}
+.s-QUEUED{background:#fbf1de;color:var(--me)}.s-CANCELLED{background:#eceef2;color:#667}
+.na{color:var(--muted);font-style:italic}
+.muted{color:var(--muted);font-size:12.5px}
+.dots{display:inline-flex;gap:3px}
+.dot{width:9px;height:9px;border-radius:2px;background:#dfe3ea;display:inline-block}
+.dot.DONE{background:var(--hi)}.dot.RUNNING{background:var(--run)}.dot.FAILED{background:var(--lo)}
+.banner{background:#fff4e5;border:1px solid #f0d3a5;border-left:6px solid var(--me);
+border-radius:8px;padding:11px 15px;margin:10px 0;font-size:13.5px}
+.banner.bad{background:#fdf3f2;border-color:#f0c5c0;border-left-color:var(--lo)}
+.banner.good{background:#eef8f2;border-color:#c3e4d2;border-left-color:var(--hi)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px 18px}
+label.f{display:block;font-size:12.5px;color:var(--muted);margin:9px 0 2px}
+input[type=text],input[type=number],input[type=date],select,textarea{width:100%;padding:7px 9px;
+border:1px solid var(--line);border-radius:6px;font:inherit;font-size:14px;background:#fff;color:var(--ink)}
+textarea{min-height:104px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px}
+.pick{max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:7px;padding:4px 10px}
+.pick label{display:flex;gap:9px;align-items:center;padding:5px 0;font-size:13.5px;border-bottom:1px solid #f1f3f7}
+.pick label:last-child{border-bottom:0}
+pre.log{background:#10151d;color:#d6dde8;border-radius:8px;padding:12px 14px;font-size:12px;
+line-height:1.5;max-height:340px;overflow:auto;margin:8px 0;white-space:pre-wrap}
+.frames{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:9px}
+.frames img{width:100%;border-radius:6px;border:1px solid var(--line)}
+footer{color:var(--muted);font-size:12px;text-align:center;margin-top:28px}
+@media (max-width:720px){header.top{padding:14px 16px}section{padding:14px}}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>SAI Archery</h1>
+  <nav>
+    <a href="/" class="">Runs</a>
+    <a href="/new" class="on">Analyse a video</a>
+    <a href="/jobs" class="">Queue</a>
+    <a href="/doctor" class="">Environment</a>
+  </nav>
+  <div class="right">v0.1.0 &middot; watching /sessions/rcw-011hpbkthhgsnev68jxqsljh/tmp/tmpu1x1m8e8/videos</div>
+</header>
+<main>
+
+<form method="post" action="/new">
+<section>
+  <h2>Videos</h2>
+  
+  
+  <p class="muted">From /sessions/rcw-011hpbkthhgsnev68jxqsljh/tmp/tmpu1x1m8e8/videos. Tick several and they run one after another.
+  The source file is never copied, moved or opened for writing.</p>
+  <div class="pick">
+    
+    <label><input type="checkbox" name="videos" value="/sessions/rcw-011hpbkthhgsnev68jxqsljh/tmp/tmpu1x1m8e8/videos/Kalapna.mov"> <b>Kalapna.mov</b>
+      <span class="muted">0.0 MB</span></label>
+    
+    <label><input type="checkbox" name="videos" value="/sessions/rcw-011hpbkthhgsnev68jxqsljh/tmp/tmpu1x1m8e8/videos/Samarth.mov"> <b>Samarth.mov</b>
+      <span class="muted">0.0 MB</span></label>
+    
+    <label><input type="checkbox" name="videos" value="/sessions/rcw-011hpbkthhgsnev68jxqsljh/tmp/tmpu1x1m8e8/videos/Tamanna.mov"> <b>Tamanna.mov</b>
+      <span class="muted">0.0 MB</span></label>
+    
+  </div>
+  
+</section>
+
+<section>
+  <h2>Session</h2>
+  <p class="muted">These apply to every video ticked above. Written to
+  <code>sessions/&lt;video&gt;.json</code>, so the same run can be repeated from the command line.</p>
+  <div class="grid">
+    <div><label class="f" for="athlete_name">Athlete name</label>
+      <input type="text" id="athlete_name" name="athlete_name" required></div>
+    <div><label class="f" for="bow_type">Bow type</label>
+      <select id="bow_type" name="bow_type">
+      <option selected>Recurve</option><option >Compound</option><option >Barebow</option><option >Traditional</option></select></div>
+    <div><label class="f" for="draw_hand">Draw hand</label>
+      <select id="draw_hand" name="draw_hand">
+      <option>right</option><option>left</option></select></div>
+    <div><label class="f" for="camera_view">Camera view</label>
+      <input type="text" id="camera_view" name="camera_view" value="side-on (bow-arm side)"></div>
+    <div><label class="f" for="session_date">Session date</label>
+      <input type="date" id="session_date" name="session_date"></div>
+    <div><label class="f" for="gender">Gender</label>
+      <select id="gender" name="gender"><option value=""></option>
+      <option>Male</option><option>Female</option><option>Other</option></select></div>
+    <div><label class="f" for="discipline">Discipline</label>
+      <input type="text" id="discipline" name="discipline" placeholder="Olympic Recurve"></div>
+    <div><label class="f" for="camera_distance_m">Camera distance (m)</label>
+      <input type="number" step="0.1" min="0.1" id="camera_distance_m" name="camera_distance_m"></div>
+    <div><label class="f" for="declared_frame_rate">Declared frame rate</label>
+      <input type="number" step="1" id="declared_frame_rate" name="declared_frame_rate"
+             placeholder="measured anyway"></div>
+    <div><label class="f" for="number_of_shots_expected">Shots expected</label>
+      <input type="number" step="1" min="1" id="number_of_shots_expected" name="number_of_shots_expected"></div>
+  </div>
+  <label class="f" for="notes">Notes</label>
+  <input type="text" id="notes" name="notes">
+  <p class="muted">Session date is optional, but <b>compare</b> uses it to warn when the order
+  of runs disagrees with the real chronology. Worth a second now.</p>
+</section>
+
+<section>
+  <h2>Athlete and physiological inputs</h2>
+  <label class="f" for="profile">Free text, one field per line</label>
+  <textarea id="profile" name="profile" spellcheck="false"
+placeholder="Height: 170 cms
+Weight: 60 kgs
+Age: 16 years
+Resting HR: 60 bpm
+Average HR: 80 bpm"></textarea>
+  <p class="muted">Parsed by the same code the command line uses, so the two cannot disagree
+  about what a line means. A value outside its plausible range is refused with the line
+  quoted, never clamped. A line nothing matches is kept as a note and never becomes evidence.</p>
+
+  <div class="grid">
+    <div><label class="f" for="force_plate">Force-plate export</label>
+      <select id="force_plate" name="force_plate"><option value="">none</option>
+      <option value="/sessions/rcw-011hpbkthhgsnev68jxqsljh/tmp/tmpu1x1m8e8/videos/Body Sway.csv">Body Sway.csv</option></select></div>
+  </div>
+  
+  <p class="muted">Rows are selected by athlete name, so the name above must match the
+  export's <code>Subject - Name</code>. A name matching none or several is refused with the
+  candidates listed, rather than quietly reporting another athlete's posture.</p>
+</section>
+
+<section>
+  <button class="btn" type="submit">Start analysis</button>
+  <span class="muted">About 22 minutes per video on this machine. Narration is roughly 15 of them.</span>
+</section>
+</form>
+
+<footer>Local only, bound to 127.0.0.1. This page serves what the pipeline produced; it computes nothing.</footer>
+</main>
+
+</body>
+</html>

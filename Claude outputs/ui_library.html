@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Runs - SAI Archery</title>
+<style>
+:root{--ink:#1d2330;--muted:#5d6678;--line:#dfe3ea;--bg:#f6f7fa;--card:#fff;--accent:#1f4e79;
+--hi:#1e7d4f;--me:#b7791f;--lo:#b8322a;--chip:#eef1f6;--run:#2a78d6}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+color:var(--ink);background:var(--bg)}
+header.top{background:linear-gradient(120deg,#12324f,#1f4e79);color:#fff;padding:18px 28px;
+display:flex;align-items:baseline;gap:22px;flex-wrap:wrap}
+header.top h1{margin:0;font-size:19px;letter-spacing:.3px;font-weight:650}
+header.top nav a{color:#cfe0f0;text-decoration:none;font-size:14px;margin-right:16px}
+header.top nav a:hover,header.top nav a.on{color:#fff;text-decoration:underline}
+header.top .right{margin-left:auto;font-size:12.5px;opacity:.8}
+main{max-width:1180px;margin:0 auto;padding:18px 16px 60px}
+section{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px 22px;margin:16px 0}
+h2{margin:0 0 10px;font-size:18px;color:var(--accent);border-bottom:2px solid var(--line);padding-bottom:7px}
+h3{font-size:15px;margin:18px 0 6px}
+table{border-collapse:collapse;width:100%;margin:8px 0 12px;font-size:13.5px}
+th,td{border:1px solid var(--line);padding:6px 9px;text-align:left;vertical-align:middle}
+th{background:var(--chip);font-weight:600}
+td.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+a{color:var(--accent)}
+.btn{display:inline-block;background:var(--accent);color:#fff;border:0;border-radius:7px;
+padding:8px 15px;font:inherit;font-size:14px;cursor:pointer;text-decoration:none}
+.btn:hover{background:#17405f}
+.btn.sm{padding:4px 10px;font-size:12.5px}
+.btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--line)}
+.btn.warn{background:var(--lo)}
+.btn[disabled]{background:#aab;cursor:not-allowed}
+.chip{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;background:var(--chip);color:#334}
+.s-DONE{background:#e3f4ec;color:var(--hi)}.s-RUNNING{background:#e4eefb;color:var(--run)}
+.s-FAILED{background:#fbe6e4;color:var(--lo)}.s-PENDING{background:#eef1f6;color:#667}
+.s-QUEUED{background:#fbf1de;color:var(--me)}.s-CANCELLED{background:#eceef2;color:#667}
+.na{color:var(--muted);font-style:italic}
+.muted{color:var(--muted);font-size:12.5px}
+.dots{display:inline-flex;gap:3px}
+.dot{width:9px;height:9px;border-radius:2px;background:#dfe3ea;display:inline-block}
+.dot.DONE{background:var(--hi)}.dot.RUNNING{background:var(--run)}.dot.FAILED{background:var(--lo)}
+.banner{background:#fff4e5;border:1px solid #f0d3a5;border-left:6px solid var(--me);
+border-radius:8px;padding:11px 15px;margin:10px 0;font-size:13.5px}
+.banner.bad{background:#fdf3f2;border-color:#f0c5c0;border-left-color:var(--lo)}
+.banner.good{background:#eef8f2;border-color:#c3e4d2;border-left-color:var(--hi)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px 18px}
+label.f{display:block;font-size:12.5px;color:var(--muted);margin:9px 0 2px}
+input[type=text],input[type=number],input[type=date],select,textarea{width:100%;padding:7px 9px;
+border:1px solid var(--line);border-radius:6px;font:inherit;font-size:14px;background:#fff;color:var(--ink)}
+textarea{min-height:104px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px}
+.pick{max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:7px;padding:4px 10px}
+.pick label{display:flex;gap:9px;align-items:center;padding:5px 0;font-size:13.5px;border-bottom:1px solid #f1f3f7}
+.pick label:last-child{border-bottom:0}
+pre.log{background:#10151d;color:#d6dde8;border-radius:8px;padding:12px 14px;font-size:12px;
+line-height:1.5;max-height:340px;overflow:auto;margin:8px 0;white-space:pre-wrap}
+.frames{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:9px}
+.frames img{width:100%;border-radius:6px;border:1px solid var(--line)}
+footer{color:var(--muted);font-size:12px;text-align:center;margin-top:28px}
+@media (max-width:720px){header.top{padding:14px 16px}section{padding:14px}}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>SAI Archery</h1>
+  <nav>
+    <a href="/" class="on">Runs</a>
+    <a href="/new" class="">Analyse a video</a>
+    <a href="/jobs" class="">Queue</a>
+    <a href="/doctor" class="">Environment</a>
+  </nav>
+  <div class="right">v0.1.0 &middot; watching /sessions/rcw-011hpbkthhgsnev68jxqsljh/tmp/tmpu1x1m8e8/videos</div>
+</header>
+<main>
+
+<section>
+  <h2>Runs</h2>
+  
+  <form method="get" style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:10px">
+    <div><label class="f" for="athlete">Athlete</label>
+      <select name="athlete" id="athlete" style="min-width:180px"><option value="">All</option>
+      <option value="Kalpana Ragar" >Kalpana Ragar</option><option value="Samarth Ragar" >Samarth Ragar</option><option value="Unknown" >Unknown</option></select></div>
+    <div><label class="f" for="status">Status</label>
+      <select name="status" id="status" style="min-width:140px"><option value="">All</option>
+      <option value="DONE" >DONE</option><option value="FAILED" >FAILED</option></select></div>
+    <button class="btn ghost sm" type="submit">Filter</button>
+    
+    <span class="muted">4 of 4</span>
+  </form>
+
+  
+  <form method="post" action="/compare">
+  <table>
+    <tr><th style="width:34px"></th><th>Athlete</th><th>Video</th><th>Session date</th>
+      <th>Shots</th><th>Status</th><th>Steps</th><th>Time</th><th>Open</th></tr>
+    
+    <tr>
+      <td><input type="checkbox" name="runs_selected" value="samarth__aug20" aria-label="Compare samarth__aug20"></td>
+      <td><a href="/run/samarth__aug20">Samarth Ragar</a><div class="muted">samarth__aug20</div></td>
+      <td>samarth__aug20.mov</td>
+      <td>2026-08-20</td>
+      <td class="num">4</td>
+      <td><span class="chip s-DONE">DONE</span>
+          
+          </td>
+      <td><span class="dots"><i class="dot DONE" title="S0 ingest: DONE"></i><i class="dot DONE" title="SP physio: DONE"></i><i class="dot DONE" title="S1 frames: DONE"></i><i class="dot DONE" title="S2 pose: DONE"></i><i class="dot DONE" title="S3 kinematics: DONE"></i><i class="dot DONE" title="S4 phases: DONE"></i><i class="dot DONE" title="S5 stats: DONE"></i><i class="dot DONE" title="S6 annotate: DONE"></i><i class="dot PENDING" title="S7 video: PENDING"></i><i class="dot DONE" title="S8 narrate: DONE"></i><i class="dot DONE" title="S9 verify: DONE"></i><i class="dot DONE" title="S10 render: DONE"></i></span>
+          <div class="muted">11/12</div></td>
+      <td class="num">23.1 min</td>
+      <td>
+        <a class="btn sm" href="/artefact/report/samarth__aug20" target="_blank">Report</a>
+        
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="runs_selected" value="kalpana__aug20" aria-label="Compare kalpana__aug20"></td>
+      <td><a href="/run/kalpana__aug20">Kalpana Ragar</a><div class="muted">kalpana__aug20</div></td>
+      <td>kalpana__aug20.mov</td>
+      <td>2026-08-20</td>
+      <td class="num">5</td>
+      <td><span class="chip s-DONE">DONE</span>
+          
+          </td>
+      <td><span class="dots"><i class="dot DONE" title="S0 ingest: DONE"></i><i class="dot DONE" title="SP physio: DONE"></i><i class="dot DONE" title="S1 frames: DONE"></i><i class="dot DONE" title="S2 pose: DONE"></i><i class="dot DONE" title="S3 kinematics: DONE"></i><i class="dot DONE" title="S4 phases: DONE"></i><i class="dot DONE" title="S5 stats: DONE"></i><i class="dot DONE" title="S6 annotate: DONE"></i><i class="dot PENDING" title="S7 video: PENDING"></i><i class="dot DONE" title="S8 narrate: DONE"></i><i class="dot DONE" title="S9 verify: DONE"></i><i class="dot DONE" title="S10 render: DONE"></i></span>
+          <div class="muted">11/12</div></td>
+      <td class="num">23.1 min</td>
+      <td>
+        <a class="btn sm" href="/artefact/report/kalpana__aug20" target="_blank">Report</a>
+        
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="runs_selected" value="kalpana__aug13" aria-label="Compare kalpana__aug13"></td>
+      <td><a href="/run/kalpana__aug13">Kalpana Ragar</a><div class="muted">kalpana__aug13</div></td>
+      <td>kalpana__aug13.mov</td>
+      <td>2026-08-13</td>
+      <td class="num">3</td>
+      <td><span class="chip s-DONE">DONE</span>
+          
+          </td>
+      <td><span class="dots"><i class="dot DONE" title="S0 ingest: DONE"></i><i class="dot DONE" title="SP physio: DONE"></i><i class="dot DONE" title="S1 frames: DONE"></i><i class="dot DONE" title="S2 pose: DONE"></i><i class="dot DONE" title="S3 kinematics: DONE"></i><i class="dot DONE" title="S4 phases: DONE"></i><i class="dot DONE" title="S5 stats: DONE"></i><i class="dot DONE" title="S6 annotate: DONE"></i><i class="dot PENDING" title="S7 video: PENDING"></i><i class="dot DONE" title="S8 narrate: DONE"></i><i class="dot DONE" title="S9 verify: DONE"></i><i class="dot DONE" title="S10 render: DONE"></i></span>
+          <div class="muted">11/12</div></td>
+      <td class="num">23.1 min</td>
+      <td>
+        <a class="btn sm" href="/artefact/report/kalpana__aug13" target="_blank">Report</a>
+        
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="runs_selected" value="tamanna__aug27" aria-label="Compare tamanna__aug27"></td>
+      <td><a href="/run/tamanna__aug27">Unknown</a><div class="muted">tamanna__aug27</div></td>
+      <td>Tamanna.mov</td>
+      <td><span class="na">not set</span></td>
+      <td class="num">-</td>
+      <td><span class="chip s-FAILED">FAILED</span>
+          
+          </td>
+      <td><span class="dots"><i class="dot DONE" title="S0 ingest: DONE"></i><i class="dot DONE" title="SP physio: DONE"></i><i class="dot DONE" title="S1 frames: DONE"></i><i class="dot DONE" title="S2 pose: DONE"></i><i class="dot FAILED" title="S3 kinematics: FAILED"></i><i class="dot PENDING" title="S4 phases: PENDING"></i><i class="dot PENDING" title="S5 stats: PENDING"></i><i class="dot PENDING" title="S6 annotate: PENDING"></i><i class="dot PENDING" title="S7 video: PENDING"></i><i class="dot PENDING" title="S8 narrate: PENDING"></i><i class="dot PENDING" title="S9 verify: PENDING"></i><i class="dot PENDING" title="S10 render: PENDING"></i></span>
+          <div class="muted">4/12</div></td>
+      <td class="num">6.8 min</td>
+      <td>
+        
+        
+        <span class="na">nothing yet</span>
+      </td>
+    </tr>
+    
+  </table>
+  <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">
+    <div><label class="f" for="sd">Deviation threshold (SD)</label>
+      <input type="number" step="0.5" min="0.5" max="6" name="sd" id="sd" value="2.0" style="width:110px"></div>
+    <button class="btn" type="submit">Compare ticked runs</button>
+    <span class="muted">One run compares its own shots. Several pool them, in the order they appear here.</span>
+  </div>
+  </form>
+  
+</section>
+
+<footer>Local only, bound to 127.0.0.1. This page serves what the pipeline produced; it computes nothing.</footer>
+</main>
+
+</body>
+</html>

@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Unknown - tamanna__aug27</title>
+<style>
+:root{--ink:#1d2330;--muted:#5d6678;--line:#dfe3ea;--bg:#f6f7fa;--card:#fff;--accent:#1f4e79;
+--hi:#1e7d4f;--me:#b7791f;--lo:#b8322a;--chip:#eef1f6;--run:#2a78d6}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+color:var(--ink);background:var(--bg)}
+header.top{background:linear-gradient(120deg,#12324f,#1f4e79);color:#fff;padding:18px 28px;
+display:flex;align-items:baseline;gap:22px;flex-wrap:wrap}
+header.top h1{margin:0;font-size:19px;letter-spacing:.3px;font-weight:650}
+header.top nav a{color:#cfe0f0;text-decoration:none;font-size:14px;margin-right:16px}
+header.top nav a:hover,header.top nav a.on{color:#fff;text-decoration:underline}
+header.top .right{margin-left:auto;font-size:12.5px;opacity:.8}
+main{max-width:1180px;margin:0 auto;padding:18px 16px 60px}
+section{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px 22px;margin:16px 0}
+h2{margin:0 0 10px;font-size:18px;color:var(--accent);border-bottom:2px solid var(--line);padding-bottom:7px}
+h3{font-size:15px;margin:18px 0 6px}
+table{border-collapse:collapse;width:100%;margin:8px 0 12px;font-size:13.5px}
+th,td{border:1px solid var(--line);padding:6px 9px;text-align:left;vertical-align:middle}
+th{background:var(--chip);font-weight:600}
+td.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+a{color:var(--accent)}
+.btn{display:inline-block;background:var(--accent);color:#fff;border:0;border-radius:7px;
+padding:8px 15px;font:inherit;font-size:14px;cursor:pointer;text-decoration:none}
+.btn:hover{background:#17405f}
+.btn.sm{padding:4px 10px;font-size:12.5px}
+.btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--line)}
+.btn.warn{background:var(--lo)}
+.btn[disabled]{background:#aab;cursor:not-allowed}
+.chip{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;background:var(--chip);color:#334}
+.s-DONE{background:#e3f4ec;color:var(--hi)}.s-RUNNING{background:#e4eefb;color:var(--run)}
+.s-FAILED{background:#fbe6e4;color:var(--lo)}.s-PENDING{background:#eef1f6;color:#667}
+.s-QUEUED{background:#fbf1de;color:var(--me)}.s-CANCELLED{background:#eceef2;color:#667}
+.na{color:var(--muted);font-style:italic}
+.muted{color:var(--muted);font-size:12.5px}
+.dots{display:inline-flex;gap:3px}
+.dot{width:9px;height:9px;border-radius:2px;background:#dfe3ea;display:inline-block}
+.dot.DONE{background:var(--hi)}.dot.RUNNING{background:var(--run)}.dot.FAILED{background:var(--lo)}
+.banner{background:#fff4e5;border:1px solid #f0d3a5;border-left:6px solid var(--me);
+border-radius:8px;padding:11px 15px;margin:10px 0;font-size:13.5px}
+.banner.bad{background:#fdf3f2;border-color:#f0c5c0;border-left-color:var(--lo)}
+.banner.good{background:#eef8f2;border-color:#c3e4d2;border-left-color:var(--hi)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px 18px}
+label.f{display:block;font-size:12.5px;color:var(--muted);margin:9px 0 2px}
+input[type=text],input[type=number],input[type=date],select,textarea{width:100%;padding:7px 9px;
+border:1px solid var(--line);border-radius:6px;font:inherit;font-size:14px;background:#fff;color:var(--ink)}
+textarea{min-height:104px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px}
+.pick{max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:7px;padding:4px 10px}
+.pick label{display:flex;gap:9px;align-items:center;padding:5px 0;font-size:13.5px;border-bottom:1px solid #f1f3f7}
+.pick label:last-child{border-bottom:0}
+pre.log{background:#10151d;color:#d6dde8;border-radius:8px;padding:12px 14px;font-size:12px;
+line-height:1.5;max-height:340px;overflow:auto;margin:8px 0;white-space:pre-wrap}
+.frames{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:9px}
+.frames img{width:100%;border-radius:6px;border:1px solid var(--line)}
+footer{color:var(--muted);font-size:12px;text-align:center;margin-top:28px}
+@media (max-width:720px){header.top{padding:14px 16px}section{padding:14px}}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>SAI Archery</h1>
+  <nav>
+    <a href="/" class="on">Runs</a>
+    <a href="/new" class="">Analyse a video</a>
+    <a href="/jobs" class="">Queue</a>
+    <a href="/doctor" class="">Environment</a>
+  </nav>
+  <div class="right">v0.1.0 &middot; watching /sessions/rcw-011hpbkthhgsnev68jxqsljh/tmp/tmpu1x1m8e8/videos</div>
+</header>
+<main>
+
+<section>
+  <h2>Unknown <span class="chip s-FAILED" id="run-status">FAILED</span>
+    </h2>
+  <div class="grid">
+    <div><div class="muted">Run</div>tamanna__aug27</div>
+    <div><div class="muted">Video</div>Tamanna.mov</div>
+    <div><div class="muted">Session date</div>not set</div>
+    <div><div class="muted">Shots detected</div>-</div>
+    <div><div class="muted">Total compute</div><span id="run-total">6.8 min</span></div>
+  </div>
+  <p style="margin-top:14px">
+    
+    
+    
+    
+    <a class="btn ghost" href="/">Back to runs</a>
+  </p>
+  
+</section>
+
+
+
+<section>
+  <h2>Steps</h2>
+  <table id="steps">
+    <tr><th>Step</th><th>Name</th><th>Status</th><th>Checks</th><th>Took</th><th>Notes</th></tr>
+    
+    <tr data-step="S0">
+      <td>S0</td><td>ingest</td>
+      <td class="c-status"><span class="chip s-DONE">DONE</span></td>
+      <td class="c-checks num">1/1</td>
+      <td class="c-took num">3s</td>
+      <td>
+        
+        
+        
+      </td>
+    </tr>
+    
+    <tr data-step="SP">
+      <td>SP</td><td>physio</td>
+      <td class="c-status"><span class="chip s-DONE">DONE</span></td>
+      <td class="c-checks num">-</td>
+      <td class="c-took num">1s</td>
+      <td>
+        
+        
+        
+      </td>
+    </tr>
+    
+    <tr data-step="S1">
+      <td>S1</td><td>frames</td>
+      <td class="c-status"><span class="chip s-DONE">DONE</span></td>
+      <td class="c-checks num">-</td>
+      <td class="c-took num">12s</td>
+      <td>
+        
+        
+        
+      </td>
+    </tr>
+    
+    <tr data-step="S2">
+      <td>S2</td><td>pose</td>
+      <td class="c-status"><span class="chip s-DONE">DONE</span></td>
+      <td class="c-checks num">-</td>
+      <td class="c-took num">6.5 min</td>
+      <td>
+        
+        
+        
+      </td>
+    </tr>
+    
+    <tr data-step="S3">
+      <td>S3</td><td>kinematics</td>
+      <td class="c-status"><span class="chip s-FAILED">FAILED</span></td>
+      <td class="c-checks num">0/2</td>
+      <td class="c-took num">2s</td>
+      <td>
+        <div><span class="chip s-FAILED">FAIL</span> <b>core_measures_available</b>: Worst NaN rate among the core measures is 71.0%. Above 40% the shot cannot be measured reliably.</div>
+        <div><span class="chip s-QUEUED">WARN</span> <b>draw_hand_consistent_with_geometry</b>: Draw arm reads as the extended one; draw_hand may be inverted.</div>
+        
+      </td>
+    </tr>
+    
+    <tr data-step="S4">
+      <td>S4</td><td>phases</td>
+      <td class="c-status"><span class="chip s-PENDING">PENDING</span></td>
+      <td class="c-checks num">-</td>
+      <td class="c-took num">-</td>
+      <td>
+        
+        
+        
+      </td>
+    </tr>
+    
+    <tr data-step="S5">
+      <td>S5</td><td>stats</td>
+      <td class="c-status"><span class="chip s-PENDING">PENDING</span></td>
+      <td class="c-checks num">-</td>
+      <td class="c-took num">-</td>
+      <td>
+        
+        
+        
+      </td>
+    </tr>
+    
+    <tr data-step="S6">
+      <td>S6</td><td>annotate</td>
+      <td class="c-status"><span class="chip s-PENDING">PENDING</span></td>
+      <td class="c-checks num">-</td>
+      <td class="c-took num">-</td>
+      <td>
+        
+        
+        
+      </td>
+    </tr>
+    
+    <tr data-step="S7">
+      <td>S7</td><td>video</td>
+      <td class="c-status"><span class="chip s-PENDING">PENDING</span></td>
+      <td class="c-checks num">-</td>
+      <td class="c-took num">-</td>
+      <td>
+        
+        
+        
+      </td>
+    </tr>
+    
+    <tr data-step="S8">
+      <td>S8</td><td>narrate</td>
+      <td class="c-status"><span class="chip s-PENDING">PENDING</span></td>
+      <td class="c-checks num">-</td>
+      <td class="c-took num">-</td>
+      <td>
+        
+        
+        
+      </td>
+    </tr>
+    
+    <tr data-step="S9">
+      <td>S9</td><td>verify</td>
+      <td class="c-status"><span class="chip s-PENDING">PENDING</span></td>
+      <td class="c-checks num">-</td>
+      <td class="c-took num">-</td>
+      <td>
+        
+        
+        
+      </td>
+    </tr>
+    
+    <tr data-step="S10">
+      <td>S10</td><td>render</td>
+      <td class="c-status"><span class="chip s-PENDING">PENDING</span></td>
+      <td class="c-checks num">-</td>
+      <td class="c-took num">-</td>
+      <td>
+        
+        
+        
+      </td>
+    </tr>
+    
+  </table>
+</section>
+
+
+
+
+
+<footer>Local only, bound to 127.0.0.1. This page serves what the pipeline produced; it computes nothing.</footer>
+</main>
+
+<script>
+const RUN = "tamanna__aug27";
+async function cancelJob(id){
+  if(!confirm("Stop this analysis? Finished steps keep their cached output, so it can be resumed.")) return;
+  const r = await fetch(`/jobs/${id}/cancel`, {method:"POST"});
+  const j = await r.json(); alert(j.detail || "cancelled"); location.reload();
+}
+
+</script>
+
+</body>
+</html>
