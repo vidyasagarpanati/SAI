@@ -141,6 +141,7 @@ the reports are all already in the repo.
 | `src/archery/web/library.py` | Reads `runs/*/state.json` into rows, and resolves a run id to the files it produced. All path safety lives here, in one place. |
 | `src/archery/web/jobs.py` | Single-worker FIFO queue. Each job is a subprocess of the CLI. |
 | `src/archery/web/app.py` | The routes. Serves and starts; computes nothing. |
+| `src/archery/web/stages.py` | Step ids to labels a person in the room can read, and the parser that spots `== S2 pose: started` in the output. |
 | `templates/web/*.html.j2` | Eight pages in the same visual language as the reports. |
 | `src/archery/cli.py` | `archery serve`, and `doctor_rows` split out of `cmd_doctor` so the CLI and the page cannot disagree about what is wrong. |
 | `tests/test_web.py` | 27 tests against real run directories. |
@@ -165,6 +166,12 @@ archery serve --videos "D:\Archery-InputData" --open
   thing in both, and an out-of-range value is refused with the line quoted.
 - Session files land in `sessions/<video>.json`, so any run started from the
   browser can be repeated from the command line.
+- **The queue shows the stage, not the last log line.** `Stage 10 of 12 -
+  Writing the report`, with a progress rule under it that turns green when the
+  run finishes and red when it fails. The stage number comes from the step's
+  position in `STEP_ORDER`, not from counting output lines, so a step served
+  from cache still advances the count honestly. The last line the pipeline
+  printed is kept as the cell's tooltip, so the operator detail is not lost.
 
 ### Verification, all passing (154 tests, 27 new)
 

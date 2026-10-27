@@ -4,17 +4,20 @@
 <section>
   <h2>Queue</h2>
   <p class="muted">One analysis at a time. The pipeline is CPU-bound, and two runs of the same
-  video would write into the same run directory.</p>
+  video would write into the same run directory. Hover a stage to see the last line the
+  pipeline printed.</p>
   {% if jobs %}
   <table id="jobs">
-    <tr><th>Video</th><th>Status</th><th>Run</th><th>Elapsed</th><th>Last line</th><th></th></tr>
+    <tr><th>Video</th><th>Status</th><th>Run</th><th>Elapsed</th><th>Stage</th><th></th></tr>
     {% for j in jobs %}
     <tr data-job="{{ j.id }}">
       <td>{{ j.video.name }}</td>
       <td class="c-status"><span class="chip s-{{ j.status }}">{{ j.status }}</span></td>
       <td>{% if j.run_id %}<a href="/run/{{ j.run_id }}">{{ j.run_id }}</a>{% else %}<span class="na">not started</span>{% endif %}</td>
-      <td class="c-elapsed num">{{ "%.0f"|format(j.elapsed_s) }}s</td>
-      <td class="c-last muted" style="max-width:420px;word-break:break-word">{{ (j.log|list)[-1] if j.log else "" }}</td>
+      <td class="c-elapsed num">{{ ("%.0f"|format(j.elapsed_s) ~ "s") if j.elapsed_s else "-" }}</td>
+      <td class="c-stage" style="max-width:420px"
+          title="{{ (j.log|list)[-1] if j.log else '' }}">{{ j.stage }}
+        {% if j.done_steps %}<div class="bar {{ j.status }}"><i style="width:{{ (100 * j.done_steps / 12)|round }}%"></i></div>{% endif %}</td>
       <td>{% if j.status in ("QUEUED","RUNNING") %}<button class="btn warn sm" onclick="cancelJob('{{ j.id }}')">Cancel</button>{% endif %}</td>
     </tr>
     {% endfor %}
@@ -36,8 +39,14 @@ async function poll(){
       const row = document.querySelector(`tr[data-job="${j.id}"]`);
       if(!row) { location.reload(); return; }
       row.querySelector(".c-status").innerHTML = `<span class="chip s-${j.status}">${j.status}</span>`;
-      row.querySelector(".c-elapsed").textContent = Math.round(j.elapsed_s) + "s";
-      row.querySelector(".c-last").textContent = j.log.length ? j.log[j.log.length-1] : "";
+      row.querySelector(".c-elapsed").textContent = j.elapsed_s ? Math.round(j.elapsed_s) + "s" : "-";
+      const cell = row.querySelector(".c-stage");
+      cell.firstChild.textContent = j.stage + " ";
+      cell.title = j.log.length ? j.log[j.log.length-1] : "";
+      let bar = cell.querySelector(".bar");
+      if(j.done_steps && !bar){ cell.insertAdjacentHTML("beforeend", '<div class="bar"><i></i></div>'); bar = cell.querySelector(".bar"); }
+      if(bar){ bar.className = "bar " + j.status;
+               bar.firstElementChild.style.width = Math.round(100 * j.done_steps / 12) + "%"; }
     }
   }catch(e){}
   setTimeout(poll, 2000);

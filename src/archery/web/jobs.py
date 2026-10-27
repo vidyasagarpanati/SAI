@@ -40,16 +40,35 @@ class Job:
     returncode: int | None = None
     log: deque = field(default_factory=lambda: deque(maxlen=LOG_LINES))
     error: str | None = None
+    step: str | None = None          # the pipeline step currently running
+    done_steps: int = 0
 
     @property
     def elapsed_s(self) -> float:
-        if not self.started:
+        if not self.started or self.status == QUEUED:
             return 0.0
         return (self.finished or time.time()) - self.started
 
+    @property
+    def stage(self) -> str:
+        """What to show instead of the last line of CLI output. A watcher wants
+        to know where in the pipeline this is, not what the logger last said."""
+        from archery.web import stages
+        if self.status == QUEUED:
+            return "Waiting for the machine"
+        if self.status == CANCELLED:
+            return f"Cancelled during {stages.label(self.step)}" if self.step else "Cancelled"
+        if self.status == DONE:
+            return f"Finished all {stages.TOTAL} stages"
+        if self.status == FAILED:
+            return (f"Failed at {stages.label(self.step)}" if self.step
+                    else "Failed before the first stage")
+        return stages.label(self.step) if self.step else "Starting"
+
     def as_dict(self) -> dict:
         return {"id": self.id, "video": self.video.name, "label": self.label,
-                "status": self.status, "run_id": self.run_id,
+                "status": self.status, "run_id": self.run_id, "stage": self.stage,
+                "step": self.step, "done_steps": self.done_steps,
                 "elapsed_s": round(self.elapsed_s, 1), "returncode": self.returncode,
                 "error": self.error, "log": list(self.log)[-40:]}
 
@@ -180,11 +199,20 @@ class JobQueue:
         with self._lock:
             self._current, self._proc = job, proc
 
+        from archery.web import stages
         for line in proc.stdout:                       # type: ignore[union-attr]
             line = line.rstrip()
             job.log.append(line)
             if job.run_id is None and line.startswith("run_id"):
                 job.run_id = line.split(":", 1)[-1].strip() or None
+            seen = stages.parse(line)
+            if seen:
+                step, event = seen
+                job.step = step
+                # The count comes from the step's position, not from how many
+                # lines went past, so a step served from cache still advances it.
+                job.done_steps = (stages.index_of(step) if event != "started"
+                                  else max(job.done_steps, stages.index_of(step) - 1))
         proc.wait()
 
         job.returncode, job.finished = proc.returncode, time.time()

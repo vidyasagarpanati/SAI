@@ -304,3 +304,62 @@ def test_filters_narrow_the_library(site):
     assert "Samarth" not in client.get("/?athlete=Kalpana").text.split("<table")[1]
     failed = client.get("/?status=FAILED")
     assert "broken__cccc" in failed.text and "kalpana__aaaa" not in failed.text.split("<table")[1]
+
+
+# ---------------------------------------------- the queue shows the stage
+def test_the_stage_is_read_from_the_pipeline_output_not_the_last_log_line():
+    """A watcher wants to know where in the pipeline this is. The step's
+    position gives the number, so a step served from cache still advances it."""
+    from archery.web import stages
+    assert stages.TOTAL == 12
+    assert stages.label("S2") == "Stage 4 of 12 - Pose estimation"
+    assert stages.label("S8") == "Stage 10 of 12 - Writing the report"
+    assert stages.parse("== S2 pose: started") == ("S2", "started")
+    assert stages.parse("== S8 narrate: PASS in 15.5 min") == ("S8", "PASS")
+    assert stages.parse("== S3 kinematics: FAILED after 2s") == ("S3", "FAILED")
+    assert stages.parse("  S8 [4/23] s04_phase/DRAW prompt~2466 tok ...") is None
+    assert stages.label(None) == ""
+
+
+def test_a_job_tracks_its_stage_through_the_run(site):
+    from archery.web.jobs import DONE, FAILED, QUEUED, RUNNING, Job
+    base, _ = site
+    job = Job(id="x", video=base / "videos" / "new_one.mov", session_path=None, label="t")
+    assert job.stage == "Waiting for the machine"
+
+    job.status = RUNNING
+    assert job.stage == "Starting"                 # nothing printed yet
+    for line, expect in (("== S0 ingest: started", "Stage 1 of 12 - Reading the video"),
+                         ("== S2 pose: started", "Stage 4 of 12 - Pose estimation"),
+                         ("== S8 narrate: started", "Stage 10 of 12 - Writing the report")):
+        step, _event = __import__("archery.web.stages", fromlist=["x"]).parse(line)
+        job.step = step
+        assert job.stage == expect
+
+    job.status = FAILED
+    assert job.stage == "Failed at Stage 10 of 12 - Writing the report"
+    job.status = DONE
+    assert job.stage == "Finished all 12 stages"
+    assert job.status != QUEUED
+
+
+def test_the_queue_page_shows_the_stage_and_keeps_the_log_line_as_a_tooltip(site):
+    _, client = site
+    from archery.web.jobs import RUNNING
+    q = client.app.state.queue
+    job = q.submit(Path("/tmp/stage_demo.mov"))
+    job.status, job.step = RUNNING, "S2"
+    job.done_steps = 3
+    job.log.append("== S2 pose: started")
+    try:
+        html = client.get("/jobs").text
+        assert "Stage 4 of 12 - Pose estimation" in html
+        assert ">Stage</th>" in html and "Last line" not in html
+        assert 'title="== S2 pose: started"' in html          # detail is kept, not lost
+        assert client.get("/api/jobs").json()["jobs"][0]["stage"].startswith("Stage 4 of 12")
+    finally:
+        try:
+            q.cancel(job.id)
+        except LookupError:
+            pass
+        q.shutdown()

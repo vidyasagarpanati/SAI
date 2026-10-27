@@ -10,6 +10,8 @@
     <div><div class="muted">Session date</div>{{ run.session_date or "not set" }}</div>
     <div><div class="muted">Shots detected</div>{{ run.n_shots if run.n_shots is not none else "-" }}</div>
     <div><div class="muted">Total compute</div><span id="run-total">{{ run.total }}</span></div>
+    <div><div class="muted">Stage</div><span id="run-stage">{{ job.stage if job else
+      ("Finished all 12 stages" if run.status == "DONE" else run.current_step or "-") }}</span></div>
   </div>
   <p style="margin-top:14px">
     {% if run.report %}<a class="btn" href="/artefact/report/{{ run.run_id }}" target="_blank">Open report</a>{% endif %}
@@ -89,6 +91,8 @@ async function poll(){
     document.getElementById("run-status").textContent = d.status;
     document.getElementById("run-status").className = "chip s-" + d.status;
     document.getElementById("run-total").textContent = d.total;
+    const stage = document.getElementById("run-stage");
+    if(stage && d.job) stage.textContent = d.job.stage;
     for(const s of d.steps){
       const row = document.querySelector(`tr[data-step="${s.step}"]`);
       if(!row) continue;

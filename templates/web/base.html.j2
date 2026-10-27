@@ -38,6 +38,9 @@ padding:8px 15px;font:inherit;font-size:14px;cursor:pointer;text-decoration:none
 .s-QUEUED{background:#fbf1de;color:var(--me)}.s-CANCELLED{background:#eceef2;color:#667}
 .na{color:var(--muted);font-style:italic}
 .muted{color:var(--muted);font-size:12.5px}
+.bar{height:4px;background:var(--line);border-radius:2px;margin-top:5px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--run);border-radius:2px;transition:width .4s}
+.bar.DONE i{background:var(--hi)}.bar.FAILED i{background:var(--lo)}.bar.CANCELLED i{background:var(--muted)}
 .dots{display:inline-flex;gap:3px}
 .dot{width:9px;height:9px;border-radius:2px;background:#dfe3ea;display:inline-block}
 .dot.DONE{background:var(--hi)}.dot.RUNNING{background:var(--run)}.dot.FAILED{background:var(--lo)}
