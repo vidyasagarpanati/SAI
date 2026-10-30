@@ -17,7 +17,7 @@ from archery import grounding
 from archery.context import Context
 from archery.contracts import WARN, StepResult
 from archery.narrator import Narrator
-from archery.report_spec import (MASTER, PRESCRIPTIVE, SKIP_FIELDS, local_checks,
+from archery.report_spec import (MASTER, PRESCRIPTIVE, SKIP_FIELDS, SUMMARY_SECTIONS, local_checks,
                                  report_order, required_calls, schema_for)
 
 
@@ -165,6 +165,18 @@ def run(ctx: Context) -> StepResult:
                             "resolved": not left})
         nar.save("all_sections", nar.outputs)
         nar.save("section_status", nar.status)
+
+    # Summaries are re-checked like everything else, but they are wording over
+    # verified sections: a rejected one is dropped, not a reason to block the report.
+    dropped = [sid for sid in SUMMARY_SECTIONS
+               if sid in nar.outputs and nar.check(sid, nar.outputs[sid], nar.schema(sid), None)]
+    for sid in dropped:
+        nar.outputs.pop(sid)
+    if dropped:
+        nar.save("all_sections", nar.outputs)
+    res.check("coach_summaries_verified", not dropped,
+              f"Dropped {dropped}; the report uses data-built summaries there." if dropped
+              else "Coach summaries passed grounding and the plain-language rules.", severity=WARN)
 
     checklist = _checklist(nar, sec, cross)
     missing = [sid for sid, _, _ in required_calls(nar.metrics) if sid not in nar.outputs] + \

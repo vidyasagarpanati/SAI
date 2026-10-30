@@ -339,3 +339,16 @@ whitelisted measure columns. A renamed or missing column fails the step and
 names the column rather than guessing. An export holding several athletes is
 fine: rows are selected by `Subject - Name`, and a name matching none or more
 than one is refused with the candidates listed.
+
+## Reading the report
+
+Each report opens with a Coach's Page, then every section shows a short summary
+with its detail under **Full analysis**. **Expand all** opens everything.
+Printing prints what is open, so a collapsed report prints as the short version.
+
+Scores, counts and tables in the summaries come straight from the verified data.
+The wording comes from four model calls (`sum_overview`, `sum_technique`,
+`sum_diagnosis`, `sum_action`), checked for typed numbers and technical words.
+If one is rejected, those sections use plainer text built from the data and the
+report stays complete. S8 logs `rejected; the report uses data-built summaries`.
+To reword an older run: `archery run --video <path> --from S8`.

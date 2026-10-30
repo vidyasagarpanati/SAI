@@ -18,7 +18,13 @@ from pathlib import Path
 
 from archery.runstate import DONE, FAILED, PENDING, RUNNING, STEP_NAMES, STEP_ORDER
 
-RUN_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$")
+# A run id is "<video file name>__<hash>", and video names are whatever the
+# camera or the coach called them: "Deepika (1).mov" is ordinary. So the rule
+# names what is dangerous rather than what is familiar: path separators, the
+# characters Windows reserves, control characters, and names the filesystem
+# would quietly alter.
+UNSAFE_CHARS = re.compile(r'[/\\:*?"<>|\x00-\x1f]')
+MAX_RUN_ID = 200
 VIDEO_SUFFIXES = {".mov", ".mp4", ".m4v", ".avi", ".mkv"}
 
 
@@ -33,7 +39,8 @@ class Unsafe(ValueError):
 def safe_run_id(run_id: str) -> str:
     """A run id is a directory name, never a path. '..' and separators are the
     whole attack, so they are rejected before anything touches the disk."""
-    if not RUN_ID.fullmatch(run_id or "") or run_id in {".", ".."}:
+    if (not run_id or len(run_id) > MAX_RUN_ID or UNSAFE_CHARS.search(run_id)
+            or run_id.startswith(".") or run_id != run_id.strip() or run_id.endswith(".")):
         raise Unsafe(f"Not a run id: {run_id!r}")
     return run_id
 
@@ -162,6 +169,10 @@ def load_run(runs_root: Path, run_id: str, outputs_root: Path) -> Run:
         candidate = Path(raw)
         if not candidate.is_absolute():
             candidate = (runs_root.parent / candidate)
+        # A project folder that was moved or renamed leaves a stale absolute
+        # path in state.json; the file itself is still in the outputs folder.
+        if not candidate.is_file():
+            candidate = outputs_root / candidate.name
         # The pipeline recorded it, but the server still refuses anything that
         # does not land where this server is allowed to read.
         if not _inside(candidate, [runs_root, outputs_root]) or not candidate.is_file():
@@ -183,12 +194,13 @@ def load_run(runs_root: Path, run_id: str, outputs_root: Path) -> Run:
 
 def list_runs(runs_root: Path, outputs_root: Path) -> list[Run]:
     """Every run directory, newest first. A directory that is not a run, or
-    whose state.json is unreadable, is skipped rather than breaking the page."""
+    whose state.json is unreadable, is skipped rather than breaking the page.
+    _compare and the _preview folders have no state.json, so no name is special."""
     out = []
     if not runs_root.is_dir():
         return out
     for child in runs_root.iterdir():
-        if not child.is_dir() or child.name.startswith("_"):
+        if not child.is_dir():
             continue
         try:
             out.append(load_run(runs_root, child.name, outputs_root))

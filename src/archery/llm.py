@@ -295,6 +295,17 @@ class FakeLLM:
                     "fix_first": [{"text": "Draw elbow alignment", "ref": W[0]}] * 3,
                     "single_correction": {"text": "Align the draw elbow behind the arrow line", "ref": W[0]},
                     "key_cue": "Elbow behind the arrow", "final_assessment": "Sound base with one clear fix."}
+        if sid.startswith("sum_"):
+            out = {"sections": [{"key": key, "headline": f"Plain headline for {key}, {cite(0)}.",
+                                 "points": [f"Plain point, {cite(1)}."]}
+                                for key in ctxj["summarise"]]}
+            if sid == "sum_overview":
+                out["phases"] = [{"phase": p, "take": f"Plain take for {p}, {cite(i)}."}
+                                 for i, p in enumerate(detected)]
+            if sid == "sum_action":
+                out["coach"] = {"does_well": ["Plain strength."] * 3, "fix_first": ["Plain fix."] * 3,
+                                "main_fix": "Plain main fix."}
+            return out
         if sid == "s01_executive":
             return {"technical_level": "Developing (see Section 12)",
                     "strongest_characteristic": {"text": "Stable bow arm", "ref": S[0]},

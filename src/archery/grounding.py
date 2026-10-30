@@ -123,10 +123,18 @@ def format_value(entry: dict) -> str:
     return f"{txt}{short}" if short == "%" else f"{txt} {short}"
 
 
+# Models write "{{k}} deg" or "{{k}} = {{k}}" although the value already carries
+# its unit, which reads "76.6 deg = 76.6 deg deg" once substituted.
+UNIT_WORD = r"(?:deg|SW/s|SW|s|fps|bpm)"
+SAME_TWICE = re.compile(rf"(-?\d+(?:\.\d+)? ({UNIT_WORD}))\s*=\s*\1(?: \2\b)?")
+UNIT_TWICE = re.compile(rf"(\d ({UNIT_WORD})) \2\b")
+
+
 def substitute(text: str, evidence: dict) -> str:
     if not isinstance(text, str):
         return text
-    return PLACEHOLDER.sub(lambda m: format_value(evidence.get(m.group(1), {})), text)
+    text = PLACEHOLDER.sub(lambda m: format_value(evidence.get(m.group(1), {})), text)
+    return UNIT_TWICE.sub(r"\1", SAME_TWICE.sub(r"\1", text))
 
 
 def substitute_all(obj: Any, evidence: dict) -> Any:

@@ -80,12 +80,17 @@ s14_weaknesses: |
   Section 14, TOP WEAKNESSES. Up to 10, ranked by accuracy impact, consistency
   impact, biomechanical significance, injury-risk relevance, ease of correction.
   Link each to the technical errors (E ids) it comes from where applicable.
+  Do not call a value excessive or severe if an earlier section read the same
+  value as low or stable; resolve the disagreement or say it is unclear.
 
 s15_priorities: |
   Section 15, PRIORITIZED IMPROVEMENT PLAN. Exactly FIVE priorities, each tied to
   a weakness (W id) or error (E id). Give a concrete technical drill with sets,
   repetitions, frequency, progression and a success metric that references an
-  evidence key where one exists.
+  evidence key where one exists. Each priority must address a different problem.
+  A target must come from the same phase as the measurement it corrects: never
+  use a stance value as the target for a full-draw measure. Do not build a
+  priority on a LOW-confidence measure without saying it needs checking first.
 
 s16_training_coaching: |
   Sections 16 and 17, TRAINING RECOMMENDATIONS and COACHING PRIORITIES.
@@ -108,6 +113,26 @@ s01_executive: |
   Section 1, EXECUTIVE SUMMARY, written last from the finished sections. Every
   item must restate a finding that already exists in those sections and carry
   its reference id. Introduce nothing new. Keep it concise.
+
+summaries: |
+  COACH SUMMARIES. The coach is busy and is not a scientist. For each section in
+  CONTEXT "summarise", write one short headline and up to three short points that
+  say what the finished sections below already found. Add nothing new.
+  - Use short, everyday words and short sentences, as if talking to the coach at
+    the range. One idea per sentence.
+  - Say what it means for the shot, not how it was measured.
+  - Avoid scientific words. Say shoulder blade (not scapula), bend (not flexion),
+    pull the shoulder blade back (not retraction), balance or body sway (not
+    centre of gravity or centre of mass), hard to see from this camera (not
+    foreshortened), measuring mistake (not artefact), back muscles (not posterior
+    chain).
+  - Every measured value is written ONLY as {{key}}. Do not type any other number,
+    not even a count such as "five errors". Leave counts out.
+  - If a finding has LOW confidence say "may" or "seems". If something could not
+    be judged, say so plainly.
+  - phases, when asked for: one short sentence per step of the shot.
+  - coach, when asked for: does_well, fix_first and main_fix restate the final
+    coaching summary in the same order, in the same plain words.
 
 p1: |
   Section PHYSIOLOGICAL INTERVENTION & HEART RATE ANALYSIS. Use hr.* and

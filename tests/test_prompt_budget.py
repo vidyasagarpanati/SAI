@@ -14,7 +14,7 @@ import pytest
 from archery.grounding import check_text
 from archery.llm import FakeLLM
 from archery.phase_defs import ORDER
-from archery.report_spec import build_prompt, required_calls
+from archery.report_spec import CALLS, SUMMARY_SECTIONS, build_prompt, required_calls
 from archery.steps import s03_kinematics, s04_phases, s05_stats, sp_physio
 import synthetic
 from helpers import make_run
@@ -47,7 +47,7 @@ def four_shot(tmp_path_factory):
 def test_every_prompt_fits_well_inside_the_context_window(four_shot):
     ctx, m, detected = four_shot
     fake, outs, sizes = FakeLLM(), {}, {}
-    for sid, deps, imgs in required_calls(m):
+    for sid, deps, imgs in required_calls(m) + [c for c in CALLS if c[0] in SUMMARY_SECTIONS]:
         if sid == "s04_phase":
             per = {}
             for ph in detected:
@@ -64,6 +64,7 @@ def test_every_prompt_fits_well_inside_the_context_window(four_shot):
     assert len(detected) == 9 and m["session"]["n_shots"] == 4
     # The physio sections were actually exercised, not quietly skipped.
     assert {"p1", "p2"} <= set(sizes)
+    assert "p1" in outs["sum_diagnosis"]["sections"][5]["key"]   # physio gets a summary too
 
 
 def test_evidence_list_is_capped(four_shot):

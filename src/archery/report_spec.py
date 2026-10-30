@@ -43,17 +43,27 @@ PHYSIO = [("p1", "PHYSIOLOGICAL INTERVENTION & HEART RATE ANALYSIS"),
           ("p2", "INTEGRATED INTERVENTION (FORCE PLATE + HEART RATE)")]
 
 
+SECTION_GROUP = {**dict.fromkeys(("s01", "s02"), "Overview"),
+                 **dict.fromkeys(("s03", "s04", "s05", "s06", "s07", "s08"), "Technique"),
+                 **dict.fromkeys(("s09", "s10", "s11", "s12", "s13"), "Diagnosis"),
+                 **dict.fromkeys(("p1", "p2"), "Physiology"),
+                 **dict.fromkeys(("s14", "s15", "s16", "s17", "s18", "s19"), "Action Plan"),
+                 "s20": "Evidence"}
+
+
 def report_order(placement: str) -> list[dict]:
     """Numbered section list. 'inline' follows decision D10 (physio after 13)."""
     out = []
     if placement == "appendix":
         for i, (k, t) in enumerate(MASTER, 1):
-            out.append({"key": k, "number": str(i), "title": t})
+            out.append({"key": k, "number": str(i), "title": t, "group": SECTION_GROUP[k]})
         for letter, (k, t) in zip("AB", PHYSIO):
-            out.append({"key": k, "number": f"Appendix {letter}", "title": t})
+            out.append({"key": k, "number": f"Appendix {letter}", "title": t,
+                        "group": SECTION_GROUP[k]})
         return out
     seq = MASTER[:13] + PHYSIO + MASTER[13:]
-    return [{"key": k, "number": str(i), "title": t} for i, (k, t) in enumerate(seq, 1)]
+    return [{"key": k, "number": str(i), "title": t, "group": SECTION_GROUP[k]}
+            for i, (k, t) in enumerate(seq, 1)]
 
 
 # ------------------------------------------------------------------ schema helpers
@@ -87,6 +97,7 @@ POINT = obj(point=STR, evidence_level=enum(LEVELS), confidence=enum(CONF), evide
 # fabricated number slipping through a free-text "topic" field that had been
 # exempted by mistake.
 SKIP_FIELDS = {"evidence_level", "confidence", "severity", "classification", "phase", "category",
+               "key",
                "id", "ref", "weakness_ref", "priority", "evidence_keys", "addresses",
                "related_errors", "shot_phase", "timestamp_key"}
 PRESCRIPTIVE = {"sets", "repetitions", "frequency", "progression", "technical_drill", "exercise",
@@ -125,6 +136,19 @@ def schema_for(sid: str, ctx: dict) -> dict:
     ID_ENUM = {"s09_errors": enum([f"E{i}" for i in range(1, 13)]),
                "s13_strengths": enum([f"S{i}" for i in range(1, 11)]),
                "s14_weaknesses": enum([f"W{i}" for i in range(1, 11)])}.get(sid, STR)
+    if sid in SUMMARY_SECTIONS:
+        short = {"type": "string", "maxLength": 320}
+        # S9 re-checks without the call's key list, so it must also accept physio.
+        wanted = ctx.get("summary_keys")
+        keys = wanted or SUMMARY_SECTIONS[sid] + SUMMARY_OPTIONAL
+        section = obj(key=enum(keys), headline=short, points=arr(short, 0, 3))
+        parts = {"sections": arr(section, len(wanted or SUMMARY_SECTIONS[sid]), len(keys))}
+        if sid == "sum_overview":
+            parts["phases"] = arr(obj(phase=enum(phases), take=short), len(phases), len(phases))
+        if sid == "sum_action":
+            parts["coach"] = obj(does_well=arr(short, 3, 3), fix_first=arr(short, 3, 3),
+                                 main_fix=short)
+        return obj(**parts)
     if sid == "s02_quality":
         return obj(camera_angle=STR, lighting=STR, athlete_visibility=STR, occlusion=STR,
                    motion_blur=STR, clothing_interference=STR, limitations=arr(STR, 1, 8))
@@ -294,8 +318,28 @@ CALLS: list[tuple[str, list[str], list[str]]] = [
     ("s18_projection_final", ["s12_scorecard", "s13_strengths", "s14_weaknesses", "s15_priorities"], []),
     ("s01_executive", ["s06_consistency", "s10_injury", "s12_scorecard", "s13_strengths",
                        "s14_weaknesses", "s15_priorities", "s18_projection_final"], []),
+    # Plain-language wording for the coach, written last from finished sections.
+    ("sum_overview", ["s01_executive", "s02_quality", "s04_phase", "s12_scorecard"], []),
+    ("sum_technique", ["s05_biomech", "s06_consistency", "s08_equipment"], []),
+    ("sum_diagnosis", ["s09_errors", "s10_injury", "s11_framework", "s12_scorecard",
+                       "s13_strengths", "p1", "p2"], []),
+    ("sum_action", ["s14_weaknesses", "s15_priorities", "s16_training_coaching",
+                    "s18_projection_final"], []),
 ]
 USES_RUBRIC = {"s11_framework", "s12_scorecard"}
+
+# Report sections each summary call writes for. s04 is covered by sum_overview's
+# phase takes; s07 and s20 are computed and need no wording.
+SUMMARY_SECTIONS = {"sum_overview": ["s01", "s02", "s03"],
+                    "sum_technique": ["s05", "s06", "s08"],
+                    "sum_diagnosis": ["s09", "s10", "s11", "s12", "s13"],
+                    "sum_action": ["s14", "s15", "s16", "s17", "s18", "s19"]}
+SUMMARY_OPTIONAL = ["p1", "p2"]         # only when that section was written
+# Words a coach should not have to look up. The Full analysis keeps them.
+JARGON = ("foreshorten", "artefact", "artifact", "scapula", "flexion", "flexor", "kinematic",
+          "kinetic", "biomechanic", "proprioce", "retraction", "centre of gravity",
+          "center of gravity", "centre of mass", "center of mass", "posterior chain",
+          "isometric", "cervical", "lumbar", "extensor", "valgus", "varus")
 
 # Sections that are not attempted at all when their evidence source is absent.
 # Asking the model to write NOT PROVIDED costs a call and risks it writing prose
@@ -307,7 +351,8 @@ def required_calls(metrics: dict) -> list[tuple[str, list[str], list[str]]]:
     """The call plan for THIS run. An optional section whose evidence source was
     not supplied is not merely unwritten, it is not required either: S9 must not
     count it missing or try to repair a section that was never attempted."""
-    return [c for c in CALLS if c[0] not in OPTIONAL or has_evidence(c[0], metrics)]
+    return [c for c in CALLS if c[0] not in SUMMARY_SECTIONS
+            and (c[0] not in OPTIONAL or has_evidence(c[0], metrics))]
 
 
 def has_evidence(sid: str, metrics: dict) -> bool:
@@ -406,6 +451,10 @@ def section_base_keys(sid: str, metrics: dict, detected: list[str]) -> list[str]
                 + phase_keys(metrics, "AIM"))
     if sid == "s01_executive":
         return ["session.n_shots", "quality.pose_detection_rate_pct"]
+    if sid == "sum_overview":
+        return quality_keys(metrics) + [k for k in ev if k.endswith(".duration_s")]
+    if sid in SUMMARY_SECTIONS:
+        return ["session.n_shots"]
     return quality_keys(metrics)
 
 
@@ -445,6 +494,10 @@ def digest(outputs: dict, deps: list[str], max_items: int = 4, max_chars: int = 
     return "\n\n".join(parts), keys
 
 
+def _section_title(key: str) -> str:
+    return dict(MASTER + PHYSIO)[key]
+
+
 def build_prompt(sid: str, cfg_prompts: dict, metrics: dict, outputs: dict, deps: list[str],
                  detected: list[str], phase: str | None, has_images: bool,
                  limits: dict | None = None) -> tuple[str, str, dict]:
@@ -458,7 +511,12 @@ def build_prompt(sid: str, cfg_prompts: dict, metrics: dict, outputs: dict, deps
     call_keys = [k for k in dict.fromkeys(base + prior_keys) if k in ev][
         :int(limits.get("max_evidence_lines", 90))]
     ctx["evidence_keys"] = call_keys
-    rules = cfg_prompts["sections"][sid]
+    summary_keys = None
+    if sid in SUMMARY_SECTIONS:
+        summary_keys = SUMMARY_SECTIONS[sid] + [
+            k for k in SUMMARY_OPTIONAL if k in deps and outputs.get(k)]
+        ctx["summary_keys"] = summary_keys
+    rules = cfg_prompts["sections"]["summaries" if summary_keys else sid]
     system = cfg_prompts["system"]
     if sid in USES_RUBRIC:
         system += "\n\n" + cfg_prompts["scoring_rubric"]
@@ -484,6 +542,8 @@ def build_prompt(sid: str, cfg_prompts: dict, metrics: dict, outputs: dict, deps
         brief["consistency_rankings"] = metrics["consistency_rankings"]
     if any(i for i in ctx["ids"].values()):
         brief["valid_ids"] = ctx["ids"]
+    if summary_keys:
+        brief["summarise"] = {k: _section_title(k) for k in summary_keys}
     user = "\n\n".join(filter(None, [
         "\n".join(header),
         "INSTRUCTIONS\n" + rules.strip(),
@@ -515,6 +575,23 @@ def local_checks(sid: str, out: dict, detected: list[str], phase: str | None,
     """Rules one section must satisfy on its own. Run by S8 before accepting an
     output, and again by S9."""
     v: list[str] = []
+
+    if sid in SUMMARY_SECTIONS:
+        got = [s["key"] for s in out["sections"]]
+        missing = [k for k in SUMMARY_SECTIONS[sid] if k not in got]
+        if missing or len(set(got)) != len(got):
+            v.append(f"sections must cover {SUMMARY_SECTIONS[sid]} once each; got {got}")
+        for path, text in walk_strings(out):
+            if path.endswith(".key") or path.endswith(".phase"):
+                continue
+            low = text.lower()
+            for word in JARGON:
+                if word in low:
+                    v.append(f"{path}: '{word}' is too technical for a coach; use everyday words")
+            for b in banned or []:
+                if re.search(rf"\b{re.escape(b)}\b", low):
+                    v.append(f"{path}: clinical language '{b}' is not allowed")
+        return v
 
     def need_keys(items, label, score_field=None):
         for i, it in enumerate(items):

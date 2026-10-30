@@ -31,6 +31,7 @@ from archery.grounding import format_value, substitute, substitute_all
 from archery.io_guard import guarded_open, guarded_path
 from archery.phase_defs import BADGE, COLOR_BGR, DISPLAY, ORDER
 from archery.report_spec import CATEGORIES, CORE, LOWER, report_order
+from archery.report_summary import build as build_summaries
 from archery.steps.s06_annotate import render_key_frame
 from archery.versioning import next_versioned, safe
 
@@ -166,6 +167,7 @@ def build_view(ctx: Context, version_label: str) -> tuple[dict, int, int]:
             canvas, _, kf = render_key_frame(fd, ctx.draw_hand, sh["shot"], code,
                                              coaching=entry["coaching"], track_conf=track)
             frames.append({"shot": sh["shot"], "t": p["key_frame_t_s"], "frame": kf, "b64": _b64(canvas, max_w, qual)})
+            entry.setdefault("thumb", _b64(canvas, 420, 60))
             n_img += 1
         entry["frames"] = frames
         phases.append(entry)
@@ -220,7 +222,7 @@ def build_view(ctx: Context, version_label: str) -> tuple[dict, int, int]:
         t = m["timing"].get(code)
         if not t:
             continue
-        timing_rows.append({"phase": DISPLAY[code], "n": t["n_shots"], "values": ", ".join(map(str, t["values_s"])),
+        timing_rows.append({"phase": DISPLAY[code], "n": t["n_shots"], "durations": ", ".join(map(str, t["values_s"])),
                             "mean": t.get("mean_s", "—"), "sd": t.get("sd_s", "—"),
                             "cv": f"{t['cv_pct']}%" if t.get("cv_pct") is not None else (t.get("status") and "n/a" or "—")})
     r = m["consistency_rankings"]
@@ -342,6 +344,9 @@ def build_view(ctx: Context, version_label: str) -> tuple[dict, int, int]:
         "checklist": ver["checklist"], "physio": physio, "provenance": provenance,
         "generated": dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
     }
+    view["n_shots"] = sess["n_shots"]
+    view["groups"] = list(dict.fromkeys(s["group"] for s in view["order"]))
+    view["summaries"], view["coach"] = build_summaries(view, ev)
     return view, n_img, n_missing
 
 
@@ -400,7 +405,8 @@ def run(ctx: Context) -> StepResult:
     expected = ["info"] + [s["key"] for s in view["order"]]
     res.check("sections_present_in_order", order_found == expected,
               f"found {order_found}" if order_found != expected else f"{len(order_found)} sections in the fixed order.")
-    res.check("one_image_per_detected_phase_per_shot", html.count("data:image/jpeg;base64,") == n_img,
+    # Counted by alt text: thumbnails and force-plate figures are also embedded.
+    res.check("one_image_per_detected_phase_per_shot", html.count('alt="Annotated key frame') == n_img,
               f"{n_img} annotated frames embedded")
     res.check("placeholder_box_per_undetected_phase", html.count("[ANNOTATED FRAME NOT AVAILABLE]") == n_missing,
               f"{n_missing} phase(s) without a frame")

@@ -41,8 +41,54 @@ td.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
 .score{font-weight:700;font-size:15px}
 .cue{font-size:18px;font-weight:600;color:var(--accent)}
 footer{color:var(--muted);font-size:12px;text-align:center;margin-top:30px}
-@media (max-width:720px){.kv{grid-template-columns:1fr}header.top{padding:20px 16px}section{padding:16px}}
-@media print{nav{display:none}section{break-inside:avoid-page}}
+nav{display:flex;align-items:center;gap:2px}
+nav button{margin-left:auto;font:600 12.5px inherit;font-family:inherit;color:#fff;background:var(--accent);border:0;border-radius:6px;padding:7px 12px;cursor:pointer;white-space:nowrap}
+main{max-width:960px}
+section{padding:18px 22px;margin:12px 0;scroll-margin-top:52px}
+.group{font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:30px 2px 6px;scroll-margin-top:52px}
+.sec-head{display:flex;align-items:center;gap:10px}
+.sec-head h2{border:0;margin:0;padding:0;font-size:17px;flex:1}
+.n{flex:none;width:26px;height:26px;line-height:26px;border-radius:50%;text-align:center;background:var(--chip);color:var(--accent);font-size:12.5px;font-weight:700}
+.pill{flex:none;font-size:12px;font-weight:600;padding:3px 10px;border-radius:12px;background:var(--chip);color:#334}
+.pill.warn,.pill.conf-MEDIUM{background:#fbf1de;color:var(--me)}.pill.ok,.pill.conf-HIGH{background:#e3f4ec;color:var(--hi)}.pill.conf-LOW{background:#fbe6e4;color:var(--lo)}.pill.mute{color:var(--muted)}
+.sum{margin-top:8px}
+.head{font-size:15.5px;font-weight:600;margin:6px 0 8px}.head.dim{font-weight:400;color:var(--muted)}
+.muted{color:var(--muted);font-size:13px;margin:8px 0 0}
+.pts{margin:6px 0;padding-left:20px}.pts li{margin:3px 0}
+.ref{display:inline-block;font-size:11px;font-weight:700;padding:1px 7px;border-radius:10px;background:var(--chip);color:var(--accent);text-decoration:none}
+.ref:hover{background:#dbe3ee}
+details{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
+summary{cursor:pointer;color:var(--accent);font-weight:600;font-size:13.5px}
+.deep{margin-top:10px;overflow-x:auto}
+.care{background:#fff8ec;border-left:4px solid var(--me);border-radius:4px;padding:8px 12px;font-size:13.5px;margin:10px 0 0}
+table.mini{font-size:13.5px;margin:6px 0}table.mini th,table.mini td{border-width:0 0 1px;background:none;padding:6px 8px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:8px 0}
+.tile{background:var(--bg);border-radius:8px;padding:8px 12px}.tile b{display:block;font-size:16px}.tile span{font-size:12px;color:var(--muted)}
+.bars{margin:8px 0}.bar{display:grid;grid-template-columns:190px 1fr 52px;gap:10px;align-items:center;padding:3px 0;font-size:13.5px}
+.bar .track{height:8px;background:var(--chip);border-radius:4px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent);border-radius:0 4px 4px 0}
+.bar .val{text-align:right;font-weight:600;font-variant-numeric:tabular-nums}
+.bar.low{font-weight:700}.bar.none{color:var(--muted)}.bar.none .track{background:none;border-top:1px dashed var(--line);height:0}
+.pgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:8px}
+.pcard{display:block;border:1px solid var(--line);border-radius:8px;overflow:hidden;color:inherit;text-decoration:none}
+.pcard:hover{border-color:var(--accent)}.pcard img{display:block;width:100%;height:auto}
+.pn{display:flex;justify-content:space-between;gap:6px;padding:7px 10px 0;font-size:13.5px}.ps{font-weight:700;white-space:nowrap}
+.pcard p{margin:2px 10px 9px;font-size:12.5px;color:var(--muted);line-height:1.4}
+.stack{display:flex;gap:2px;height:12px;margin:8px 0}.stack i{border-radius:2px}
+.s-HIGH{background:var(--hi)}.s-MEDIUM{background:var(--me)}.s-LOW{background:var(--lo)}
+.legend{display:flex;gap:16px;font-size:13px}.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px}
+.coach{border:2px solid var(--accent)}.coach h3{margin:0 0 6px;font-size:14.5px}
+.hero{display:flex;gap:18px;align-items:stretch}
+.big{flex:none;text-align:center;padding:8px 18px;background:var(--bg);border-radius:10px}
+.big b{font-size:44px;line-height:1;color:var(--accent)}.big span{font-size:18px;color:var(--muted)}.big small{display:block;font-size:12px;color:var(--muted)}
+.cue-box{flex:1;background:var(--accent);color:#fff;border-radius:10px;padding:12px 18px;display:flex;flex-direction:column;justify-content:center}
+.cue-box small{opacity:.8}.cue-box p{margin:2px 0 0;font-size:20px;font-weight:600;line-height:1.3}
+.limit{background:#fff8ec;border-radius:8px;padding:9px 13px;font-size:13.5px;margin:12px 0}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}.two ol{margin:0;padding-left:20px;font-size:14px}.two li{margin:4px 0}
+.good,.fix{border:1px solid var(--line);border-radius:8px;padding:11px 14px}.good h3{color:var(--hi)}.fix h3{color:var(--lo)}
+.one{background:var(--bg);border-radius:8px;padding:10px 14px;margin:12px 0 16px}.one small{color:var(--muted)}.one p{margin:2px 0 0;font-weight:600}
+@media (max-width:720px){.kv{grid-template-columns:1fr}header.top{padding:20px 16px}section{padding:16px}.pgrid{grid-template-columns:repeat(2,1fr)}.two{grid-template-columns:1fr}.hero{flex-direction:column}.bar{grid-template-columns:130px 1fr 46px}}
+@media print{nav,summary{display:none}section{break-inside:auto}.sum,.coach{break-inside:avoid}}
 </style>
 </head>
 <body>
@@ -50,12 +96,27 @@ footer{color:var(--muted);font-size:12px;text-align:center;margin-top:30px}
 {% macro lvl(l) %}{% if l %}<span class="chip">[{{ l }}]</span>{% endif %}{% endmacro %}
 {% macro txt(t) %}{% if t is none or t == "" %}<span class="na">Not available from supplied video.</span>{% elif "NOT RELIABLY ASSESSABLE" in t or "NOT PROVIDED" in t %}<span class="na">{{ t }}</span>{% else %}{{ t }}{% endif %}{% endmacro %}
 {% macro score(s) %}{% if s is none %}<span class="na">NOT RELIABLY ASSESSABLE</span>{% else %}<span class="score">{{ s }}/10</span>{% endif %}{% endmacro %}
+{% macro ref(r) %}{% if r and r != "NOT ESTABLISHED" %}<a class="ref" href="#{{ r }}">{{ r }}</a>{% endif %}{% endmacro %}
+{% macro cell(c) %}{% if c is mapping %}{% if c.ref %}{{ ref(c.ref) }}{% else %}<span class="chip {{ c.cls }}">{{ c.text }}</span>{% endif %}{% else %}{{ c }}{% endif %}{% endmacro %}
+{% macro bars(rows) %}<div class="bars">{% for b in rows %}{% if b.score is none %}<div class="bar none"><span>{{ b.label }}</span><span class="track"></span><span class="val">n/a</span></div>{% else %}<div class="bar{{ ' low' if b.low }}" title="{{ b.label }}: {{ b.score }}/10"><span>{{ b.label }}</span><span class="track"><i style="width:{{ b.score * 10 }}%"></i></span><span class="val">{{ b.score }}/10</span></div>{% endif %}{% endfor %}</div>{% endmacro %}
+{% macro section_head(number, title, e) %}<div class="sec-head">{% if number %}<span class="n">{{ number }}</span>{% endif %}<h2>{{ title }}</h2>{% if e.pill %}<span class="pill {{ e.pill[1] }}">{{ e.pill[0] }}</span>{% endif %}</div>{% endmacro %}
+{% macro summary_of(e) %}<div class="sum">
+  {% if e.head %}<p class="head{{ ' dim' if e.dim }}">{{ e.head }}</p>{% endif %}
+  {% if e.points %}<ul class="pts">{% for p in e.points %}<li>{{ p }}</li>{% endfor %}</ul>{% endif %}
+  {% if e.tiles %}<div class="tiles">{% for val, label in e.tiles %}<div class="tile"><b>{{ val }}</b><span>{{ label }}</span></div>{% endfor %}</div>{% endif %}
+  {% if e.grid %}<div class="pgrid">{% for g in e.grid %}{% if g.detected %}<a class="pcard" href="#ph-{{ g.code }}">{% if g.thumb %}<img alt="Key frame, {{ g.name }}" src="data:image/jpeg;base64,{{ g.thumb }}">{% endif %}<div class="pn"><b>{{ loop.index }}. {{ g.name }}</b>{% if g.score is not none %}<span class="ps">{{ g.score }}/10</span>{% endif %}</div><p>{{ g.take }}</p></a>{% else %}<div class="pcard"><div class="pn"><b>{{ loop.index }}. {{ g.name }}</b></div><p>Not found in this video.</p></div>{% endif %}{% endfor %}</div>{% endif %}
+  {% if e.table and e.table.rows %}<table class="mini"><tr>{% for h in e.table.head %}<th>{{ h }}</th>{% endfor %}</tr>{% for row in e.table.rows %}<tr>{% for c in row %}<td>{{ cell(c) }}</td>{% endfor %}</tr>{% endfor %}</table>{% endif %}
+  {% if e.bars %}{{ bars(e.bars) }}{% endif %}
+  {% if e.stack %}<div class="stack" title="{% for l, c in e.stack %}{{ l }} {{ c }} {% endfor %}">{% for l, c in e.stack %}{% if c %}<i class="s-{{ l }}" style="flex:{{ c }}"></i>{% endif %}{% endfor %}</div><div class="legend">{% for l, c in e.stack %}<span><i class="s-{{ l }}"></i>{{ l }} {{ c }}</span>{% endfor %}</div>{% endif %}
+  {% if e.muted %}<p class="muted">{{ e.muted }}</p>{% endif %}
+  {% if e.care %}<p class="care"><b>&#9888; Read with care:</b> {{ e.care }}</p>{% endif %}
+</div>{% endmacro %}
 
 <header class="top">
-  <h1>ARCHERY VIDEO &amp; BIOMECHANICS ANALYSIS REPORT</h1>
+  <h1>Archery Coach Report</h1>
   <div class="sub">{{ v.athlete_name }} &middot; {{ v.session_date }} &middot; report {{ v.version_label }} &middot; run {{ v.run_id }}</div>
 </header>
-<nav>{% for s in v.order %}<a href="#sec-{{ s.key }}">{{ s.number }}. {{ s.title|title }}</a>{% endfor %}</nav>
+<nav>{% if v.coach %}<a href="#coach">Coach's Page</a>{% endif %}{% for g in v.groups %}<a href="#g-{{ g|replace(' ', '-') }}">{{ g }}</a>{% endfor %}<button id="toggle" type="button">Expand all</button></nav>
 <main>
 {% if v.partial %}
 <div class="banner"><b>PARTIAL REPORT.</b> {{ v.failed|length }} section(s) could not be produced
@@ -63,8 +124,27 @@ and are marked NOT AVAILABLE below, with the reason. Every other section is comp
 Nothing has been guessed to fill a gap. See Section 20 for the verification record.</div>
 {% endif %}
 
+{% if v.coach %}{% set c = v.coach %}
+<section id="coach" class="coach">
+  <div class="hero">
+    {% if c.score is not none %}<div class="big"><b>{{ c.score }}</b><span>/10</span><small>Overall technique</small></div>{% endif %}
+    <div class="cue-box"><small>Key coaching cue</small><p>"{{ c.cue }}"</p></div>
+  </div>
+  <p class="limit"><b>Before you read:</b> {{ c.limits|join(" ") }} Analysis confidence: {{ conf(c.confidence) }}</p>
+  <div class="two">
+    <div class="good"><h3>&#10003; Does well</h3><ol>{% for i in c.does_well %}<li>{{ i.text }} {{ ref(i.ref) }}</li>{% endfor %}</ol></div>
+    <div class="fix"><h3>&#9650; Fix first</h3><ol>{% for i in c.fix_first %}<li>{{ i.text }} {{ ref(i.ref) }}{% if i.low %} <span class="chip c-LOW">Check on video</span>{% endif %}</li>{% endfor %}</ol></div>
+  </div>
+  <div class="one"><small>Single most important correction</small><p>{{ c.main_fix.text }} {{ ref(c.main_fix.ref) }}</p></div>
+  {% if c.bars %}<h3>Score by step</h3>{{ bars(c.bars) }}{% endif %}
+  <p class="muted">SW = shoulder widths. Every section below opens with a summary; use <b>Full analysis</b> to go deeper.</p>
+</section>
+{% endif %}
+
 <section id="sec-info">
-  <h2>ATHLETE / SESSION INFORMATION</h2>
+  {{ section_head("", "Athlete / Session Information", v.summaries.info) }}
+  {{ summary_of(v.summaries.info) }}
+  <details><summary>Full session details</summary><div class="deep">
   <div class="kv">{% for k, val in v.info %}<div>{{ k }}</div><div>{{ txt(val) }}</div>{% endfor %}</div>
   <h3>Basic Athlete &amp; Session Information</h3>
   <table><tr><th>Field</th><th>Value (or "NOT PROVIDED")</th></tr>
@@ -73,12 +153,16 @@ Nothing has been guessed to fill a gap. See Section 20 for the verification reco
   <table><tr><th>Field</th><th>Value (or "NOT PROVIDED")</th></tr>
   {% for k, val in v.pre_video %}<tr><td>{{ k }}</td><td>{{ txt(val) }}</td></tr>{% endfor %}</table>
   <p><b>Additional Data Available:</b> {% if v.additional %}{{ v.additional|join("; ") }}{% else %}<span class="na">NOT PROVIDED - CANNOT BE CONFIRMED</span>{% endif %}</p>
+  </div></details>
 </section>
 
 {% for s in v.order %}
-<section id="sec-{{ s.key }}">
-<h2>{{ s.number }}. {{ s.title }}</h2>
+{% if loop.changed(s.group) %}<div class="group" id="g-{{ s.group|replace(' ', '-') }}">{{ s.group }}</div>{% endif %}
 {% set k = s.key %}
+<section id="sec-{{ s.key }}">
+{{ section_head(s.number, s.title|title, v.summaries[k]) }}
+{{ summary_of(v.summaries[k]) }}
+<details{{ ' open' if v.failed.get(k) }}><summary>Full analysis</summary><div class="deep">
 
 {% if v.failed.get(k) %}
   <div class="na-box"><b>NOT AVAILABLE (section failed).</b>
@@ -114,7 +198,7 @@ Nothing has been guessed to fill a gap. See Section 20 for the verification reco
 {% elif k == "s04" %}
   {% for p in v.phases %}
   <div class="phase" style="border-color:{{ p.color }}">
-    <h3>Phase {{ p.badge }}: {{ p.name }}</h3>
+    <h3 id="ph-{{ p.code }}">Phase {{ p.badge }}: {{ p.name }}</h3>
     {% if p.detected and p.failed %}
       <div class="na-box"><b>ANALYSIS NOT AVAILABLE.</b> The phase was extracted and measured, but
       its written analysis could not be produced. Reason: {{ p.failed }}.</div>
@@ -157,7 +241,7 @@ Nothing has been guessed to fill a gap. See Section 20 for the verification reco
 {% elif k == "s06" %}
   <h3>Phase timing across shots</h3>
   <table><tr><th>Phase</th><th>Shots</th><th>Durations (s)</th><th>Mean</th><th>SD</th><th>CV</th></tr>
-  {% for r in v.timing_rows %}<tr><td>{{ r.phase }}</td><td class="num">{{ r.n }}</td><td>{{ r.values }}</td><td class="num">{{ r.mean }}</td><td class="num">{{ r.sd }}</td><td class="num">{{ r.cv }}</td></tr>{% endfor %}</table>
+  {% for r in v.timing_rows %}<tr><td>{{ r.phase }}</td><td class="num">{{ r.n }}</td><td>{{ r.durations }}</td><td class="num">{{ r.mean }}</td><td class="num">{{ r.sd }}</td><td class="num">{{ r.cv }}</td></tr>{% endfor %}</table>
   <table>{% for label, val in v.rankings %}<tr><th style="width:32%">{{ label }}</th><td>{{ txt(val) }}</td></tr>{% endfor %}</table>
   <h3>Likely effects</h3>
   <table><tr><th>Aspect</th><th>Explanation</th><th>Confidence</th></tr>
@@ -176,7 +260,7 @@ Nothing has been guessed to fill a gap. See Section 20 for the verification reco
 {% elif k == "s09" %}
   {% if v.n.s09_errors.errors %}
   <table><tr><th>Rank</th><th>Error</th><th>Timestamp</th><th>Phase</th><th>Evidence</th><th>Cause</th><th>Biomechanical Effect</th><th>Performance Effect</th><th>Severity</th><th>Correction</th></tr>
-  {% for e in v.n.s09_errors.errors|sort(attribute="rank") %}<tr><td>{{ e.rank }} <span class="chip">{{ e.id }}</span></td><td>{{ e.error }}</td><td class="num">{{ e.timestamp }}</td><td>{{ e.phase }}</td><td>{{ txt(e.evidence) }} {{ conf(e.confidence) }}</td><td>{{ e.cause }}</td><td>{{ e.biomechanical_effect }}</td><td>{{ e.performance_effect }}</td><td><span class="chip sev-{{ e.severity }}">{{ e.severity }}</span></td><td>{{ e.correction }}</td></tr>{% endfor %}</table>
+  {% for e in v.n.s09_errors.errors|sort(attribute="rank") %}<tr><td>{{ e.rank }} <span class="chip" id="{{ e.id }}">{{ e.id }}</span></td><td>{{ e.error }}</td><td class="num">{{ e.timestamp }}</td><td>{{ e.phase }}</td><td>{{ txt(e.evidence) }} {{ conf(e.confidence) }}</td><td>{{ e.cause }}</td><td>{{ e.biomechanical_effect }}</td><td>{{ e.performance_effect }}</td><td><span class="chip sev-{{ e.severity }}">{{ e.severity }}</span></td><td>{{ e.correction }}</td></tr>{% endfor %}</table>
   {% else %}<p class="na">No significant technical errors could be established from the available evidence.</p>{% endif %}
 
 {% elif k == "s10" %}
@@ -197,13 +281,13 @@ Nothing has been guessed to fill a gap. See Section 20 for the verification reco
   <tr><th>{{ label }}</th><td>{{ score(sc[key].score) }}</td><td>{{ txt(sc[key].justification) }}</td><td>{{ conf(sc[key].confidence) }}</td></tr>{% endfor %}</table>
 
 {% elif k == "s13" %}
-  {% for i in v.n.s13_strengths["items"] %}<div class="prio"><b>{{ loop.index }}. {{ i.strength }}</b> <span class="chip">{{ i.id }}</span> {{ conf(i.confidence) }}
+  {% for i in v.n.s13_strengths["items"] %}<div class="prio"><b>{{ loop.index }}. {{ i.strength }}</b> <span class="chip" id="{{ i.id }}">{{ i.id }}</span> {{ conf(i.confidence) }}
   <div><b>Evidence:</b> {{ txt(i.evidence) }}</div><div><b>Biomechanical reason:</b> {{ i.biomechanical_reason }}</div>
   <div><b>Performance benefit:</b> {{ i.performance_benefit }}</div><div><b>Maintenance strategy:</b> {{ i.maintenance_strategy }}</div></div>{% endfor %}
   {% if v.n_strengths < 10 %}<p><b>Only {{ v.n_strengths }} strengths could be reliably established from the available video.</b></p>{% endif %}
 
 {% elif k == "s14" %}
-  {% for i in v.n.s14_weaknesses["items"]|sort(attribute="rank") %}<div class="prio"><b>{{ i.rank }}. {{ i.weakness }}</b> <span class="chip">{{ i.id }}</span> {{ conf(i.confidence) }} <span class="chip">Priority {{ i.priority }}</span>
+  {% for i in v.n.s14_weaknesses["items"]|sort(attribute="rank") %}<div class="prio"><b>{{ i.rank }}. {{ i.weakness }}</b> <span class="chip" id="{{ i.id }}">{{ i.id }}</span> {{ conf(i.confidence) }} <span class="chip">Priority {{ i.priority }}</span>
   <div><b>Evidence:</b> {{ txt(i.evidence) }}</div><div><b>Likely cause:</b> {{ i.likely_cause }}</div>
   <div><b>Performance consequence:</b> {{ i.performance_consequence }}</div><div><b>Correction:</b> {{ i.correction }}</div></div>{% endfor %}
 
@@ -380,9 +464,23 @@ Nothing has been guessed to fill a gap. See Section 20 for the verification reco
   <p class="na">NOT PROVIDED - CANNOT BE CONFIRMED. No force-plate export was supplied with this session.</p>
   {% endif %}
 {% endif %}
+</div></details>
 </section>
 {% endfor %}
 <footer>Generated by the SAI archery biomechanics pipeline &middot; {{ v.generated }}</footer>
 </main>
+<script>
+(function(){
+var btn=document.getElementById('toggle'),open=false;
+btn.addEventListener('click',function(){open=!open;
+ document.querySelectorAll('details').forEach(function(d){d.open=open});
+ btn.textContent=open?'Collapse all':'Expand all'});
+function reveal(id){var el=document.getElementById(id);if(!el)return;
+ for(var p=el.parentElement;p;p=p.parentElement){if(p.tagName==='DETAILS')p.open=true}
+ el.scrollIntoView({block:'center'})}
+document.addEventListener('click',function(e){var a=e.target.closest('a[href^="#"]');
+ if(a&&a.closest('main')){e.preventDefault();reveal(a.getAttribute('href').slice(1))}});
+})();
+</script>
 </body>
 </html>

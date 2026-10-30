@@ -4,7 +4,8 @@ IN     05_metrics.json (sliced per section), 06_manifest.json (key frames)
 DO     one Ollama call per report section (one per detected phase for Section
        4), temperature 0, fixed seed, schema-enforced JSON, cached by request
        hash. Each output is self-checked (schema, evidence grounding, section
-       rules) and regenerated with the violations listed when it fails.
+       rules) and regenerated with the violations listed when it fails. The
+       sum_* calls then reword the finished sections plainly for the coach.
 OUT    08_narrative/<section>.json, all_sections.json, generation_log.json,
        usage.json (token counts)
 VERIFY every section generated and passing its own checks

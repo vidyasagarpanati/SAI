@@ -18,8 +18,8 @@ import jsonschema
 from archery import grounding
 from archery.io_guard import guarded_open, guarded_path
 from archery.phase_defs import ORDER
-from archery.report_spec import (CALLS, OPTIONAL, PRESCRIPTIVE, SKIP_FIELDS, build_prompt,
-                                 has_evidence, local_checks, required_calls,
+from archery.report_spec import (CALLS, OPTIONAL, PRESCRIPTIVE, SKIP_FIELDS, SUMMARY_SECTIONS,
+                                 build_prompt, has_evidence, local_checks, required_calls,
                                  schema_for, valid_ids)
 
 EVIDENCE_LINE = re.compile(r"^\{\{([\w.\-]+)\}\} = ", re.M)
@@ -278,6 +278,13 @@ class Narrator:
                 continue
             out, probs, att = self.generate(sid, deps, img_phases)
             retries += att
+            if probs and sid in SUMMARY_SECTIONS:
+                # Wording only. The report falls back to text built from the data,
+                # so this must not turn a complete report into a PARTIAL one.
+                self._record_failure(sid, probs, att)
+                print(f"  S8: {sid} rejected; the report uses data-built summaries there",
+                      flush=True)
+                continue
             if probs:
                 failed[sid] = probs
                 self._record_failure(sid, probs, att)

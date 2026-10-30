@@ -13,7 +13,7 @@
     <tr data-job="{{ j.id }}">
       <td>{{ j.video.name }}</td>
       <td class="c-status"><span class="chip s-{{ j.status }}">{{ j.status }}</span></td>
-      <td>{% if j.run_id %}<a href="/run/{{ j.run_id }}">{{ j.run_id }}</a>{% else %}<span class="na">not started</span>{% endif %}</td>
+      <td>{% if j.run_id %}<a href="/run/{{ j.run_id|urlencode }}">{{ j.run_id }}</a>{% else %}<span class="na">not started</span>{% endif %}</td>
       <td class="c-elapsed num">{{ ("%.0f"|format(j.elapsed_s) ~ "s") if j.elapsed_s else "-" }}</td>
       <td class="c-stage" style="max-width:420px"
           title="{{ (j.log|list)[-1] if j.log else '' }}">{{ j.stage }}

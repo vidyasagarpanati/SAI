@@ -14,9 +14,9 @@
       ("Finished all 12 stages" if run.status == "DONE" else run.current_step or "-") }}</span></div>
   </div>
   <p style="margin-top:14px">
-    {% if run.report %}<a class="btn" href="/artefact/report/{{ run.run_id }}" target="_blank">Open report</a>{% endif %}
-    {% if run.video %}<a class="btn ghost" href="/artefact/video/{{ run.run_id }}" target="_blank">Annotated video</a>{% endif %}
-    {% if run.evidence %}<a class="btn ghost" href="/artefact/evidence/{{ run.run_id }}?download=1">Evidence file</a>{% endif %}
+    {% if run.report %}<a class="btn" href="/artefact/report/{{ run.run_id|urlencode }}" target="_blank">Open report</a>{% endif %}
+    {% if run.video %}<a class="btn ghost" href="/artefact/video/{{ run.run_id|urlencode }}" target="_blank">Annotated video</a>{% endif %}
+    {% if run.evidence %}<a class="btn ghost" href="/artefact/evidence/{{ run.run_id|urlencode }}?download=1">Evidence file</a>{% endif %}
     {% if job and job.status in ("QUEUED", "RUNNING") %}
       <button class="btn warn" onclick="cancelJob('{{ job.id }}')">Cancel</button>{% endif %}
     <a class="btn ghost" href="/">Back to runs</a>
@@ -29,7 +29,7 @@
 <section>
   <h2>Annotated video</h2>
   <video controls preload="metadata" style="width:100%;border-radius:8px;border:1px solid var(--line)"
-         src="/artefact/video/{{ run.run_id }}"></video>
+         src="/artefact/video/{{ run.run_id|urlencode }}"></video>
   <p class="muted">Angles drawn on the frames are image-plane measurements, so they can be
   checked against the pixels around them. A joint marked <b>!</b> is not square to the camera.</p>
 </section>
@@ -66,7 +66,7 @@
 <section>
   <h2>Key frames</h2>
   <div class="frames">
-    {% for f in frames %}<figure style="margin:0"><img loading="lazy" src="/frame/{{ run.run_id }}/{{ f }}" alt="{{ f }}">
+    {% for f in frames %}<figure style="margin:0"><img loading="lazy" src="/frame/{{ run.run_id|urlencode }}/{{ f }}" alt="{{ f }}">
       <figcaption class="muted">{{ f }}</figcaption></figure>{% endfor %}
   </div>
 </section>
@@ -85,7 +85,7 @@ async function cancelJob(id){
 let misses = 0;
 async function poll(){
   try{
-    const r = await fetch(`/api/run/${RUN}`);
+    const r = await fetch(`/api/run/${encodeURIComponent(RUN)}`);
     if(!r.ok) throw new Error(r.status);
     const d = await r.json(); misses = 0;
     document.getElementById("run-status").textContent = d.status;

@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 from pathlib import Path
+from urllib.parse import quote
 
 import pytest
 
@@ -102,8 +104,8 @@ def test_a_partial_report_is_labelled(site):
 
 
 # 1 -----------------------------------------------------------------
-@pytest.mark.parametrize("bad", ["..", "../../etc", "a/b", "a\\b", "", ".",
-                                 "%2e%2e", "run id with spaces"])
+@pytest.mark.parametrize("bad", ["..", "../../etc", "a/b", "a\\b", "", ".", "C:evil",
+                                 "%2e%2e", ".hidden", "name.", " name", "a\x00b", "x" * 201])
 def test_a_run_id_that_is_not_a_directory_name_is_refused(site, bad):
     base, _ = site
     with pytest.raises((lib.Unsafe, lib.NotFound)):
@@ -137,6 +139,69 @@ def test_a_recorded_path_outside_the_served_roots_is_not_served(site, tmp_path):
     finally:
         data["steps"]["S10"]["outputs"]["report"] = keep
         state.write_text(json.dumps(data))
+
+
+# ------------------------------------- a finished run is never hidden
+@pytest.fixture
+def named_run(site):
+    """A finished run named the way the pipeline names it: the video's own file
+    name plus a hash. Copies a real run so state.json is the pipeline's."""
+    base, client = site
+    made = []
+
+    def make(run_id):
+        src = base / "runs" / "kalpana__aaaa"
+        dst = base / "runs" / run_id
+        shutil.copytree(src, dst)
+        made.append(dst)
+        return dst
+    yield make, base, client
+    for d in made:
+        shutil.rmtree(d)
+
+
+@pytest.mark.parametrize("run_id", ["Deepika (1)__6e63fd04", "Final shot, day 2__11111111",
+                                    "A#1 & more__22222222", "50% draw__33333333",
+                                    "O'Brien__44444444", "दीपिका__55555555",
+                                    "_leading_underscore__66666666"])
+def test_a_generated_report_is_listed_and_opens_whatever_the_video_was_called(named_run, run_id):
+    """Regression: 'Deepika (1).mov' finished, wrote its report, and was missing
+    from the runs page, because the id failed a character whitelist and the
+    library skips what it cannot load."""
+    make, base, client = named_run
+    make(run_id)
+    assert run_id in {r.run_id for r in lib.list_runs(base / "runs", base / "outputs")}
+
+    page = client.get("/").text
+    href = "/artefact/report/" + quote(run_id, safe="/")
+    assert f'href="{href}"' in page.replace("&#39;", "'").replace("&amp;", "&")
+
+    report = client.get(href)
+    assert report.status_code == 200 and "Archery Biomechanics Report" in report.text
+    assert client.get("/run/" + quote(run_id)).status_code == 200
+    assert client.get("/api/run/" + quote(run_id)).json()["has_report"] is True
+
+
+def test_a_report_survives_the_project_folder_being_moved(site):
+    """state.json holds absolute paths. After a move they are stale, but the
+    report is still in the outputs folder and must still be offered."""
+    base, _ = site
+    state = base / "runs" / "kalpana__aaaa" / "state.json"
+    data = json.loads(state.read_text())
+    keep = data["steps"]["S10"]["outputs"]["report"]
+    data["steps"]["S10"]["outputs"]["report"] = "/old/place/outputs/" + Path(keep).name
+    state.write_text(json.dumps(data))
+    try:
+        assert lib.load_run(base / "runs", "kalpana__aaaa", base / "outputs").report is not None
+    finally:
+        data["steps"]["S10"]["outputs"]["report"] = keep
+        state.write_text(json.dumps(data))
+
+
+def test_folders_that_are_not_runs_stay_out_of_the_library(site):
+    base, _ = site
+    (base / "runs" / "_compare" / "x").mkdir(parents=True)
+    assert "_compare" not in {r.run_id for r in lib.list_runs(base / "runs", base / "outputs")}
 
 
 # 7 -----------------------------------------------------------------

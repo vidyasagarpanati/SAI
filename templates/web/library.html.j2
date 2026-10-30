@@ -32,7 +32,7 @@
     {% for r in bucket %}
     <tr>
       <td><input type="checkbox" name="runs_selected" value="{{ r.run_id }}" aria-label="Compare {{ r.run_id }}"></td>
-      <td><a href="/run/{{ r.run_id }}">{{ r.athlete }}</a><div class="muted">{{ r.run_id }}</div></td>
+      <td><a href="/run/{{ r.run_id|urlencode }}">{{ r.athlete }}</a><div class="muted">{{ r.run_id }}</div></td>
       <td>{{ r.video_name }}</td>
       <td>{{ r.session_date or '<span class="na">not set</span>'|safe }}</td>
       <td class="num">{{ r.n_shots if r.n_shots is not none else "-" }}</td>
@@ -43,8 +43,8 @@
           <div class="muted">{{ r.done_steps }}/{{ r.steps|length }}</div></td>
       <td class="num">{{ r.total }}</td>
       <td>
-        {% if r.report %}<a class="btn sm" href="/artefact/report/{{ r.run_id }}" target="_blank">Report</a>{% endif %}
-        {% if r.video %}<a class="btn sm ghost" href="/artefact/video/{{ r.run_id }}" target="_blank">Video</a>{% endif %}
+        {% if r.report %}<a class="btn sm" href="/artefact/report/{{ r.run_id|urlencode }}" target="_blank">Report</a>{% endif %}
+        {% if r.video %}<a class="btn sm ghost" href="/artefact/video/{{ r.run_id|urlencode }}" target="_blank">Video</a>{% endif %}
         {% if not r.report and not r.video %}<span class="na">nothing yet</span>{% endif %}
       </td>
     </tr>

@@ -103,7 +103,7 @@ STEP_DEPS: dict[str, dict[str, list[str]]] = {
            "code": ["steps/s09_verify.py", "narrator.py", "report_spec.py", "grounding.py"]},
     "S10": {"steps": ["S0", "SP", "S5", "S6", "S8", "S9"], "config": ["render", "report"],
             "session": ["*"],
-            "code": ["steps/s10_render.py", "overlay.py", "grounding.py", "framedata.py",
+            "code": ["steps/s10_render.py", "report_summary.py", "overlay.py", "grounding.py", "framedata.py",
                      "../../templates/report.html.j2"]},
 }
 
