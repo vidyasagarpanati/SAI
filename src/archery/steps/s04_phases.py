@@ -20,6 +20,8 @@ How a shot is found (all thresholds in phase_rules.yaml):
   8. AIM        between a settled anchor and expansion
   9. FOLLOW_THROUGH, RECOVERY   fixed window after release, then until the bow
                 arm drops back
+ 10. SHOT CYCLE the timed shot, hook-and-grip to release (see shot_cycle in
+                phase_rules.yaml). Recorded beside the phases; it moves none of them.
 
 A phase the signals do not support is recorded as detected=false with the
 reason. It is never filled in with a guessed boundary.
@@ -137,7 +139,13 @@ def run(ctx: Context) -> StepResult:
     B = k["bow_arm_elevation_norm"].to_numpy()
     usable = k["frame_usable"].to_numpy().astype(bool)
     n_visible = k["n_visible_landmarks"].to_numpy()
+    VB = k["bow_wrist_speed_norm_s"].to_numpy()
+    # Runs analysed before the hand-gap signal existed have no column; every
+    # shot then starts at setup, flagged, rather than failing.
+    G_gap = (k["hand_gap_norm"].to_numpy() if "hand_gap_norm" in k.columns
+             else np.full(n, np.nan))
     h = int(bc["hysteresis_frames"])
+    cyc = rules.get("shot_cycle") or {}
 
     # ---- 1-2. anchored runs and releases ---------------------------------
     mask = anchored_mask(A, sd_["anchor_distance_enter"], sd_["anchor_distance_exit"],
@@ -289,6 +297,35 @@ def run(ctx: Context) -> StepResult:
                                      "confidence": "MANUAL", "driving_signal": "manual override",
                                      "reason": None})
 
+        # ---- shot cycle: hook and grip, then release ---------------------
+        gap = np.nan_to_num(G_gap, nan=np.inf)
+        close = gap <= cyc.get("hook_max_hand_gap", 1.0)
+        still = ((np.nan_to_num(V, nan=np.inf) <= cyc.get("hook_max_hand_speed", 0.5))
+                 & (np.nan_to_num(VB, nan=np.inf) <= cyc.get("hook_max_hand_speed", 0.5)))
+        lead_lo = max(win_lo, setup_start - _frames(cyc.get("hook_max_lead_s", 8.0), fps))
+        candidates = np.where((close & still)[lead_lo:setup_start])[0]
+        hook = None
+        if candidates.size:
+            last = lead_lo + int(candidates[-1])
+            first = walk_back(close, last, win_lo, h)
+            if last - first + 1 >= _frames(cyc.get("hook_min_hold_s", 0.3), fps):
+                hook = first
+        if "HOOK" in ov and isinstance(ov["HOOK"], (int, float)):
+            c0, event, c_conf = int(np.searchsorted(t, float(ov["HOOK"]))), "MANUAL", "MANUAL"
+        elif hook is not None:
+            c0, event = hook, "HOOK_GRIP"
+            c_conf = grade(G_gap, hook, cyc.get("hook_max_hand_gap", 1.0), usable, h)
+        else:
+            c0, event, c_conf = setup_start, "SETUP_FALLBACK", "LOW"
+        cycle = {"start_event": event, "start_frame": c0, "start_t_s": round(float(t[c0]), 3),
+                 "start_confidence": c_conf,
+                 "end_event": "RELEASE", "end_frame": r, "end_t_s": round(float(t[r]), 3),
+                 "end_confidence": sh["release_conf"],
+                 "duration_s": round((r - c0) / fps, 3),
+                 "reason": None if event != "SETUP_FALLBACK" else
+                 "hook and grip not seen (hands not together and still before setup); "
+                 "the shot is timed from the bow arm starting to rise"}
+
         # ---- assemble in canonical order, enforce no overlap, pick key frames
         phases, last_end = [], win_lo - 1
         for code in ORDER:
@@ -322,6 +359,7 @@ def run(ctx: Context) -> StepResult:
                                               if sh["release_peak_speed"] is not None else None),
             "window": [win_lo, win_hi],
             "source": "manual+rules" if ov else "rules",
+            "cycle": cycle,
             "phases": phases,
         })
 
@@ -344,6 +382,7 @@ def run(ctx: Context) -> StepResult:
             "draw_wrist_speed_norm_s": pct(V),
             "draw_elbow_rate_deg_s": pct(E_rate),
             "bow_arm_elevation_norm": pct(B),
+            "hand_gap_norm": pct(G_gap),
             "frames_anchored": int(mask.sum()),
             "anchored_runs_before_min_hold_filter": len(runs(mask)),
         },
@@ -386,6 +425,12 @@ def run(ctx: Context) -> StepResult:
     res.check("key_frames_usable", not missing_kf,
               f"No usable key frame for: {missing_kf}" if missing_kf else
               "Every detected phase has a key frame with adequate landmark quality.", severity=WARN)
+    fallback = [s["shot"] for s in shots if s["cycle"]["start_event"] == "SETUP_FALLBACK"]
+    res.check("shot_start_hook_seen", not fallback,
+              f"Hook and grip not seen for shot(s) {fallback}; timed from setup instead, "
+              f"LOW confidence. Tune shot_cycle in phase_rules.yaml from "
+              f"signal_summary.hand_gap_norm." if fallback else
+              "Every shot is timed from hook and grip to release.", severity=WARN)
     res.check("all_phases_detected", not undetected,
               "; ".join(undetected) if undetected else "All nine phases detected in every shot.",
               severity=WARN)

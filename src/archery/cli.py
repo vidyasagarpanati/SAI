@@ -511,6 +511,59 @@ def safe_label(text: str) -> str:
     return safe(text)
 
 
+def cmd_delete(args) -> int:
+    from archery import trash
+    from archery.runstate import RUNNING
+    cfg = _bootstrap(args.root)
+    runs, outs = cfg.paths.runs_dir, cfg.paths.outputs_dir
+    for run_id in args.run_ids:
+        try:
+            state = json.loads((runs / run_id / "state.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            state = {}
+        running = [s for s, rec in (state.get("steps") or {}).items() if rec.get("status") == RUNNING]
+        if running and not args.force:
+            print(f"  skipped {run_id}: {running[0]} is marked RUNNING. If that run crashed, "
+                  f"add --force.")
+            continue
+        try:
+            d = trash.delete(runs, outs, run_id)
+        except (trash.NotFound, trash.Unsafe, OSError) as exc:
+            print(f"  skipped {run_id}: {exc}")
+            continue
+        print(f"  deleted {run_id}  ({len(d.files)} output file(s))  ->  restore with: "
+              f"archery restore \"{d.trash_id}\"")
+    return 0
+
+
+def cmd_restore(args) -> int:
+    from archery import trash
+    cfg = _bootstrap(args.root)
+    try:
+        run_id = trash.restore(cfg.paths.runs_dir, cfg.paths.outputs_dir, args.trash_id)
+    except (trash.NotFound, trash.Unsafe, FileExistsError) as exc:
+        raise SystemExit(str(exc))
+    print(f"restored {run_id}")
+    return 0
+
+
+def cmd_deleted(args) -> int:
+    from archery import trash
+    cfg = _bootstrap(args.root)
+    items = trash.listing(cfg.paths.runs_dir)
+    if args.empty:
+        if not args.yes:
+            raise SystemExit(f"This erases {len(items)} deleted run(s) for good. "
+                             f"Add --yes to confirm.")
+        print(f"erased {trash.empty(cfg.paths.runs_dir)} deleted run(s)")
+        return 0
+    if not items:
+        print("Nothing in Deleted.")
+    for d in items:
+        print(f"  {d.deleted_at}  {d.athlete:<20} {d.trash_id}")
+    return 0
+
+
 def cmd_serve(args) -> int:
     """The local UI. Bound to 127.0.0.1 and nothing else: there is no
     authentication because nothing is exposed, and that is only true while the
@@ -624,6 +677,20 @@ def build_parser() -> argparse.ArgumentParser:
     w.add_argument("--videos", help="Folder the new-run page offers videos from.")
     w.add_argument("--open", action="store_true", help="Open a browser once it is up.")
     w.set_defaults(func=cmd_serve)
+
+    x = sub.add_parser("delete", help="Move runs, and the reports they produced, to Deleted.")
+    x.add_argument("run_ids", nargs="+", metavar="RUN_ID")
+    x.add_argument("--force", action="store_true", help="Delete even if a step is marked RUNNING.")
+    x.set_defaults(func=cmd_delete)
+
+    rs = sub.add_parser("restore", help="Put a deleted run back.")
+    rs.add_argument("trash_id", help="As listed by `archery deleted`.")
+    rs.set_defaults(func=cmd_restore)
+
+    dl = sub.add_parser("deleted", help="List deleted runs, or erase them for good.")
+    dl.add_argument("--empty", action="store_true", help="Erase every deleted run permanently.")
+    dl.add_argument("--yes", action="store_true")
+    dl.set_defaults(func=cmd_deleted)
 
     s = sub.add_parser("status", help="Show the state of a run.")
     s.add_argument("run_id", nargs="?")

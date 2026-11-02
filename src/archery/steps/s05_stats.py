@@ -183,6 +183,13 @@ def run(ctx: Context) -> StepResult:
         s_out = {"shot": sh["shot"], "release_t_s": sh["release_t_s"],
                  "release_confidence": sh["release_confidence"], "phases": {}}
         ev(f"shot{sh['shot']}.release_t_s", sh["release_t_s"], "s", sh["release_confidence"])
+        cycle = sh.get("cycle")
+        if cycle:
+            s_out["cycle"] = dict(cycle)
+            weakest = "LOW" if "LOW" in (cycle["start_confidence"], cycle["end_confidence"]) else \
+                "MEDIUM" if "MEDIUM" in (cycle["start_confidence"], cycle["end_confidence"]) else "HIGH"
+            for k2 in ("start_t_s", "end_t_s", "duration_s"):
+                ev(f"shot{sh['shot']}.cycle.{k2}", cycle[k2], "s", weakest)
         for p in sh["phases"]:
             code = p["phase"]
             if not p["detected"]:
@@ -241,6 +248,25 @@ def run(ctx: Context) -> StepResult:
     phase_codes = [p["phase"] for p in phases["shots"][0]["phases"]] if phases["shots"] else []
     cross: dict[str, dict] = {}
     timing: dict[str, dict] = {}
+
+    # The shot as a whole, hook and grip to release: the one span with the same
+    # start and end in every shot and every video, so the one to compare.
+    cycles = [s["cycle"] for s in per_shot if s.get("cycle")]
+    cdurs = [c["duration_s"] for c in cycles]
+    cycle_timing = {"n_shots": len(cdurs), "values_s": cdurs,
+                    "hook_seen": sum(c["start_event"] in ("HOOK_GRIP", "MANUAL") for c in cycles),
+                    "definition": "hook and grip to arrow release"}
+    if len(cdurs) >= min_shots:
+        arr = np.array(cdurs)
+        cycle_timing.update({"mean_s": _r(arr.mean(), 3), "sd_s": _r(arr.std(ddof=1), 3),
+                             "cv_pct": _r(100 * arr.std(ddof=1) / arr.mean(), 1)
+                             if arr.mean() > 0 else None})
+        for stat, suffix in (("mean_s", "mean"), ("sd_s", "sd"), ("cv_pct", "cv_pct")):
+            ev(f"all.cycle.duration_s.{suffix}", cycle_timing[stat],
+               "%" if stat == "cv_pct" else "s",
+               "MEDIUM" if cycle_timing["hook_seen"] < len(cdurs) else "HIGH", len(cdurs))
+    else:
+        cycle_timing["status"] = suppressed_reason or NOT_ASSESSABLE
     for code in phase_codes:
         durs = [s["phases"][code]["duration_s"] for s in per_shot
                 if s["phases"].get(code, {}).get("detected")]
@@ -367,6 +393,7 @@ def run(ctx: Context) -> StepResult:
         "cross_shot": {"min_shots_for_sd": min_shots, "n_shots": n_shots,
                        "status": suppressed_reason, "by_phase": cross},
         "timing": timing,
+        "shot_cycle_timing": cycle_timing,
         "consistency_rankings": rankings,
         "benchmarks": benchmarks,
         "measure_units": {m: spec[0] for m, spec in measures.items()},

@@ -9,7 +9,7 @@
 # "signal_summary" (percentiles of every driving signal on YOUR footage), and set
 # thresholds from those numbers. Do not tune by eye.
 
-version: 2
+version: 3
 
 shot_detection:
   anchor_distance_enter: 0.45     # draw wrist to mouth-corner midpoint, below this = anchored
@@ -42,6 +42,19 @@ phases:
   recovery:
     bow_arm_drop_fraction: 0.15   # recovery ends when bow arm falls back below this fraction
     max_duration_s: 1.50
+
+# The SHOT, as timed for comparison: from hooking and gripping (USA Archery /
+# KiSik Lee National Training System step 3) to the arrow release (step 12).
+# The pose model sees wrists, not fingers, so hook-and-grip is read as the draw
+# hand resting at the string beside the bow hand, both still, shortly before
+# the bow arm rises. When that is not seen, the shot starts at setup (the bow
+# arm starting to rise) and is marked LOW confidence. Tune hook_max_hand_gap
+# from signal_summary.hand_gap_norm on your own footage.
+shot_cycle:
+  hook_max_hand_gap: 1.0          # shoulder widths between draw wrist and bow wrist
+  hook_max_hand_speed: 0.5        # both wrists slower than this (shoulder widths/s)
+  hook_min_hold_s: 0.30           # hands together at least this long
+  hook_max_lead_s: 8.0            # hook-and-grip must end within this long before setup
 
 boundary_confidence:
   hysteresis_frames: 3            # tolerated noisy frames when walking a boundary, and the

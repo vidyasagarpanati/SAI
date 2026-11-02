@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 from archery import __version__, charts
+from archery.compare import CYCLE, CYCLE_NAME
 from archery.io_guard import guarded_open, guarded_path
 from archery.phase_defs import BADGE, DISPLAY
 from archery.versioning import next_versioned, safe
@@ -22,7 +23,7 @@ def render(payload: dict, outputs_dir: Path, evidence_dir: Path, label: str) -> 
 
     payload = dict(payload)
     payload["phase_badges"] = {c: BADGE[c] for c in DISPLAY}
-    payload["phase_names"] = {c: DISPLAY[c] for c in DISPLAY}
+    payload["phase_names"] = {**{c: DISPLAY[c] for c in DISPLAY}, CYCLE: CYCLE_NAME}
     payload["measure_names"] = MEASURE_NAMES
 
     # The numbers behind every mark, written before the HTML, so nothing

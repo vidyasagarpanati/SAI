@@ -12,44 +12,13 @@ refuses it unless it lands inside the run or output directories.
 from __future__ import annotations
 
 import json
-import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from archery.run_ids import NotFound, Unsafe, run_dir, safe_run_id  # noqa: F401  (re-exported)
 from archery.runstate import DONE, FAILED, PENDING, RUNNING, STEP_NAMES, STEP_ORDER
 
-# A run id is "<video file name>__<hash>", and video names are whatever the
-# camera or the coach called them: "Deepika (1).mov" is ordinary. So the rule
-# names what is dangerous rather than what is familiar: path separators, the
-# characters Windows reserves, control characters, and names the filesystem
-# would quietly alter.
-UNSAFE_CHARS = re.compile(r'[/\\:*?"<>|\x00-\x1f]')
-MAX_RUN_ID = 200
 VIDEO_SUFFIXES = {".mov", ".mp4", ".m4v", ".avi", ".mkv"}
-
-
-class NotFound(LookupError):
-    """No such run, or no such artefact in it."""
-
-
-class Unsafe(ValueError):
-    """A path that would leave the directories this server may serve."""
-
-
-def safe_run_id(run_id: str) -> str:
-    """A run id is a directory name, never a path. '..' and separators are the
-    whole attack, so they are rejected before anything touches the disk."""
-    if (not run_id or len(run_id) > MAX_RUN_ID or UNSAFE_CHARS.search(run_id)
-            or run_id.startswith(".") or run_id != run_id.strip() or run_id.endswith(".")):
-        raise Unsafe(f"Not a run id: {run_id!r}")
-    return run_id
-
-
-def run_dir(runs_root: Path, run_id: str) -> Path:
-    path = (runs_root / safe_run_id(run_id)).resolve()
-    if not path.is_dir() or runs_root.resolve() not in path.parents:
-        raise NotFound(f"No run directory for {run_id!r}")
-    return path
 
 
 def _inside(path: Path, roots: list[Path]) -> bool:
@@ -187,7 +156,7 @@ def load_run(runs_root: Path, run_id: str, outputs_root: Path) -> Run:
         session_date=date, created=data.get("created"), status=status,
         current_step=running, steps=steps, total_s=total,
         partial=bool(report and "_PARTIAL" in report.name),
-        report=report, video=output_of("S7", "video"),
+        report=report, video=output_of("S7", "published_video") or output_of("S7", "video"),
         evidence=(path / "05_metrics.json") if (path / "05_metrics.json").is_file() else None,
         n_shots=shots)
 

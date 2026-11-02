@@ -333,3 +333,40 @@ def test_a_rejected_summary_call_falls_back_to_the_data_and_stays_complete(tmp_p
     assert "PARTIAL REPORT" not in html
     assert "Plain headline" not in html and "technique error" in html
     assert 'class="sum"' in html
+
+
+# --------------------------------------------------------- score explanation
+def test_the_score_is_explained_right_under_it(full):
+    _, base, *_ = full
+    html = _report(base)
+    head = html[html.index('id="coach"'):html.index('id="sec-info"')]
+    assert "Score explanation" in head
+    assert head.index("Overall technique") < head.index("Score explanation")
+    assert "On the 0-10 scale, 6-7 means: one moderate fault" in head   # fake model scores 7
+    assert "Lowered it:" in head and 'href="#E1"' in head
+    assert "Held it up:" in head and "How this score was reached" in head
+    assert "Biggest gain expected from:" in head
+
+
+def test_the_explanation_reads_the_same_rubric_the_model_scores_against():
+    from archery.config import load_config
+    from archery.report_summary import rubric_bands
+    bands = rubric_bands(load_config(Path(__file__).resolve().parents[1]).prompts["scoring_rubric"])
+    assert [(lo, hi) for lo, hi, _ in bands] == [(10, 10), (8, 9), (6, 7), (4, 5), (2, 3), (0, 1)]
+
+
+def test_a_score_above_the_rubric_for_its_errors_is_flagged():
+    from archery.report_summary import score_explanation
+    v = {"n": {"s12_scorecard": {"overall_technique": {"score": 8, "justification": "x"},
+                                 "phases": []},
+               "s09_errors": {"errors": [{"id": "E1", "rank": 1, "error": "Collapse",
+                                          "severity": "CRITICAL"}]}},
+         "framework": [], "n_shots": 1}
+    x = score_explanation(v, [(8, 9, "Minor deviations only.")])
+    assert "at most 5/10" in x["note"]
+    assert any("shot consistency" in t.lower() and "three" in t for t in x["not_counted"])
+
+
+def test_the_timing_table_has_the_whole_shot_row(full):
+    _, base, *_ = full
+    assert "Whole shot: hook and grip to release" in _report(base)

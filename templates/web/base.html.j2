@@ -71,6 +71,7 @@ footer{color:var(--muted);font-size:12px;text-align:center;margin-top:28px}
     <a href="/" class="{{ 'on' if nav == 'library' }}">Runs</a>
     <a href="/new" class="{{ 'on' if nav == 'new' }}">Analyse a video</a>
     <a href="/jobs" class="{{ 'on' if nav == 'jobs' }}">Queue{% if active_jobs %} ({{ active_jobs|length }}){% endif %}</a>
+    <a href="/deleted" class="{{ 'on' if nav == 'deleted' }}">Deleted</a>
     <a href="/doctor" class="{{ 'on' if nav == 'doctor' }}">Environment</a>
   </nav>
   <div class="right">v{{ version }}{% if video_folder %} &middot; watching {{ video_folder }}{% endif %}</div>

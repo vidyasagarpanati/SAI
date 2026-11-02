@@ -283,7 +283,107 @@ def _coach_page(v: dict, flagged: set[str], plain: dict) -> dict | None:
             "confidence": v["overall_conf"]}
 
 
-def build(v: dict, ev: dict) -> tuple[dict, dict | None]:
+BAND = re.compile(r"^(\d+)(?:-(\d+))?\s+(.+)$")
+SEVERITY_CAP = {"CRITICAL": 5, "MODERATE": 7, "MINOR": 9}
+
+
+def rubric_bands(text: str) -> list[tuple[int, int, str]]:
+    """(low, high, meaning) rows from scoring_rubric.md, the same text the model
+    scores against, so the explanation cannot describe a different scale."""
+    rows = []
+    for line in (text or "").splitlines():
+        m = BAND.match(line.strip())
+        if m:
+            lo = int(m.group(1))
+            rows.append((lo, int(m.group(2) or lo), m.group(3).strip()))
+    return rows
+
+
+def _rubric_guide(errors: list[dict]) -> tuple[int, str]:
+    """Highest score the rubric allows for these errors, and why."""
+    sev = [e["severity"] for e in errors]
+    if "CRITICAL" in sev:
+        return (3 if sev.count("CRITICAL") > 1 else 5), "a critical error"
+    if sev.count("MODERATE") > 1:
+        return 5, "several moderate errors"
+    if "MODERATE" in sev or sev.count("MINOR") > 1:
+        return 7, "a moderate error" if "MODERATE" in sev else "several minor errors"
+    if sev:
+        return 9, "minor errors only"
+    return 10, "no errors"
+
+
+def score_explanation(v: dict, bands: list[tuple[int, int, str]]) -> dict | None:
+    """Why the overall score is what it is, from the verified sections only:
+    where it sits on the rubric, what pulled it down, what held it up, what
+    could not count, and the one change the plan expects to matter most."""
+    n = v["n"]
+    sc = n.get("s12_scorecard") or {}
+    if not sc:
+        return None
+    overall = sc.get("overall_technique") or {}
+    score = overall.get("score")
+    errors = sorted(n.get("s09_errors", {}).get("errors", []), key=lambda e: e["rank"])
+    strengths = n.get("s13_strengths", {}).get("items", [])
+    plan = sorted(n.get("s15_priorities", {}).get("priorities", []), key=lambda p: p["rank"])
+    scored = _scored_phases(v)
+
+    out = {"score": score, "lines": [], "lowered": [], "held_up": [], "not_counted": [],
+           "areas": [], "steps": [], "note": None,
+           "assessor": overall.get("justification")}
+    if score is None:
+        out["meaning"] = ("No overall score was given: the evidence for it was only low "
+                          "confidence, and the rules say not to guess.")
+    else:
+        band = next(((lo, hi, text) for lo, hi, text in bands if lo <= score <= hi), None)
+        out["meaning"] = (f"On the 0-10 scale, {band[0] if band[0] == band[1] else f'{band[0]}-{band[1]}'} "
+                          f"means: {band[2][0].lower() + band[2][1:]}" if band else "")
+
+    by_sev = {s: [e for e in errors if e["severity"] == s] for s in ("CRITICAL", "MODERATE", "MINOR")}
+    for s, items in by_sev.items():
+        if items:
+            out["lowered"].append({"text": f"{len(items)} {s.lower()} error{'s' if len(items) > 1 else ''}: "
+                                           + "; ".join(e["error"].rstrip(".") for e in items[:3])
+                                           + ("; ..." if len(items) > 3 else ""),
+                                   "refs": [e["id"] for e in items[:3]]})
+    if scored:
+        low = min(scored, key=lambda p: p["score"])
+        if score is not None and low["score"] < score:
+            out["lowered"].append({"text": f"Weakest step: {low['phase_name']} at {low['score']}/10",
+                                   "refs": []})
+        high = max(scored, key=lambda p: p["score"])
+        out["held_up"].append({"text": f"Strongest step: {high['phase_name']} at {high['score']}/10",
+                               "refs": []})
+    for i in strengths[:2]:
+        out["held_up"].append({"text": i["strength"].rstrip("."), "refs": [i["id"]]})
+
+    labels = {"biomechanical_efficiency": "Efficiency", "movement_stability": "Stability",
+              "shot_consistency": "Shot consistency"}
+    for key, label in labels.items():
+        part = sc.get(key) or {}
+        out["areas"].append({"label": label, "score": part.get("score")})
+        if part.get("score") is None:
+            out["not_counted"].append(
+                f"{label}: not scored"
+                + (f" (only {v['n_shots']} shot{'s' if v['n_shots'] != 1 else ''}; "
+                   f"needs at least three)" if key == "shot_consistency" and v["n_shots"] < 3 else ""))
+    skipped = [c["label"].split(". ", 1)[-1] for c in v["framework"] if c.get("score") is None]
+    if skipped:
+        out["not_counted"].append("Cannot be judged from video, so not part of the score: "
+                                  + ", ".join(skipped))
+    out["steps"] = [{"label": p["phase_name"], "score": p["score"]} for p in scored]
+    if plan:
+        out["next"] = {"text": plan[0]["issue"].rstrip("."), "ref": plan[0]["weakness_ref"]}
+
+    if score is not None:
+        cap, why = _rubric_guide(errors)
+        if score > cap:
+            out["note"] = (f"This score is above what the rubric allows with {why} "
+                           f"(at most {cap}/10). Treat it with care and ask for it to be reviewed.")
+    return out
+
+
+def build(v: dict, ev: dict, rubric: str = "") -> tuple[dict, dict | None]:
     """Section summaries by key, and the Coach's Page."""
     wording, takes, plain = _wording(v["n"])
     flagged = low_confidence_ids(v["n"], ev)
@@ -299,4 +399,11 @@ def build(v: dict, ev: dict) -> tuple[dict, dict | None]:
             entry["points"] = said["points"] or entry["points"]
         if entry.get("fixed_points"):
             entry["points"] = entry["fixed_points"]
-    return sections, _coach_page(v, flagged, plain)
+    coach = _coach_page(v, flagged, plain)
+    explanation = score_explanation(v, rubric_bands(rubric))
+    if coach is not None:
+        coach["explanation"] = explanation
+    if explanation and "s12" not in v["failed"]:
+        sections["s12"]["muted"] = ("Why this score: see Score explanation on the Coach's Page. "
+                                    "Scores for each step are in the Skill-Phase section.")
+    return sections, coach

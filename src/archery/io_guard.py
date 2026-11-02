@@ -3,8 +3,10 @@
 Guarantees enforced here:
   1. The source video is opened read-only and its directory is never writable.
   2. Every write in the pipeline routes through ``guarded_open`` / ``guarded_path``.
-  3. There is no delete primitive anywhere in this package. Nothing the pipeline
-     touches is ever removed. Cleanup is a human decision.
+  3. The pipeline has no delete primitive. Nothing a pipeline step touches is
+     ever removed. Cleanup is a human decision, made through archery/trash.py
+     (the runs page or `archery delete`), which moves a run aside recoverably
+     and is imported by no pipeline step.
 """
 from __future__ import annotations
 

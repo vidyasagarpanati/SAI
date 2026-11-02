@@ -66,7 +66,9 @@ def shot_timeline(payload: dict, row_h: int = 26, pad_left: int = 132,
     if not shots:
         return '<p class="na">No shots to draw.</p>'
 
-    longest = max((s["total_s"] or 0) for s in shots) or 1.0
+    # x runs from hook and grip to release, so every bar starts and ends at the
+    # same two moments of the shot. Phase time outside that span is not drawn.
+    longest = max(((s.get("cycle") or {}).get("duration_s") or 0) for s in shots) or 1.0
     plot_w = width - pad_left - 70
     top = 34
     rows, y = [], top
@@ -100,12 +102,19 @@ def shot_timeline(payload: dict, row_h: int = 26, pad_left: int = 132,
             continue
         out.append(f'<text class="rowlab" x="{pad_left - 8}" y="{ry + 15}" '
                    f'text-anchor="end">{esc(s["label"])}</text>')
+        cyc = s.get("cycle") or {}
+        c0, c1 = cyc.get("start_t_s"), cyc.get("end_t_s")
         cursor = 0.0
         for i, code in enumerate([c for c in order if c in s["phases"]]):
             p = s["phases"][code]
             dur = p["duration_s"]
             if dur is None:
                 continue
+            if c0 is not None and c1 is not None and p.get("start_t_s") is not None:
+                lo, hi = max(p["start_t_s"], c0), min(p["start_t_s"] + dur, c1)
+                if hi <= lo:
+                    continue
+                cursor, dur = lo - c0, hi - lo
             x = pad_left + plot_w * cursor / longest
             w = max(plot_w * dur / longest - 2, 1.0)      # 2px surface gap
             cls = SEG_A if i % 2 == 0 else SEG_B
@@ -120,9 +129,10 @@ def shot_timeline(payload: dict, row_h: int = 26, pad_left: int = 132,
                            f'y="{ry + row_h / 2 + 3:.0f}" text-anchor="middle">'
                            f'{esc(badges[code])}</text>')
             cursor += dur
-        if s["total_s"] is not None:
-            out.append(f'<text class="total" x="{pad_left + plot_w * cursor / longest + 6:.1f}" '
-                       f'y="{ry + 15}">{s["total_s"]:.2f}s</text>')
+        if cyc.get("duration_s") is not None:
+            flag = "*" if cyc.get("start_event") == "SETUP_FALLBACK" else ""
+            out.append(f'<text class="total" x="{pad_left + plot_w * cyc["duration_s"] / longest + 6:.1f}" '
+                       f'y="{ry + 15}">{cyc["duration_s"]:.2f}s{flag}</text>')
     out.append("</svg>")
     return "\n".join(out)
 
@@ -132,9 +142,11 @@ def timeline_legend(payload: dict) -> str:
         f'<span class="lg"><b>{esc(payload["phase_badges"][c])}</b> {esc(payload["phase_names"][c])}</span>'
         for c in payload["phase_order"])
     return (f'<div class="legend">{items}</div>'
-            '<p class="cap">Every bar starts at zero: the x axis is seconds from the start '
-            'of that shot, not clock time, so shots filmed weeks apart sit on one '
-            'scale. Segments alternate shade only so the boundaries are visible; '
+            '<p class="cap">Every bar runs from hook and grip (zero) to the arrow release, '
+            'the same two moments in every shot: the x axis is seconds into the shot, not '
+            'clock time, so shots filmed weeks apart sit on one scale. Standing before the '
+            'hook and the follow-through after release are outside the shot and not drawn. '
+            'A time marked * is timed from setup because the hook was not seen. Segments alternate shade only so the boundaries are visible; '
             'the badge on each segment names the phase. A hollow segment rests on a '
             'LOW-confidence boundary. A phase that was not detected is absent from the '
             'bar, never drawn as zero.</p>')

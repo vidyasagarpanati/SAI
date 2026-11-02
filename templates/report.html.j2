@@ -86,6 +86,7 @@ table.mini{font-size:13.5px;margin:6px 0}table.mini th,table.mini td{border-widt
 .limit{background:#fff8ec;border-radius:8px;padding:9px 13px;font-size:13.5px;margin:12px 0}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:12px}.two ol{margin:0;padding-left:20px;font-size:14px}.two li{margin:4px 0}
 .good,.fix{border:1px solid var(--line);border-radius:8px;padding:11px 14px}.good h3{color:var(--hi)}.fix h3{color:var(--lo)}
+.why{border:1px solid var(--line);border-radius:8px;padding:11px 14px;margin:12px 0}.why h3{color:var(--accent)}.why p{margin:4px 0}
 .one{background:var(--bg);border-radius:8px;padding:10px 14px;margin:12px 0 16px}.one small{color:var(--muted)}.one p{margin:2px 0 0;font-weight:600}
 @media (max-width:720px){.kv{grid-template-columns:1fr}header.top{padding:20px 16px}section{padding:16px}.pgrid{grid-template-columns:repeat(2,1fr)}.two{grid-template-columns:1fr}.hero{flex-direction:column}.bar{grid-template-columns:130px 1fr 46px}}
 @media print{nav,summary{display:none}section{break-inside:auto}.sum,.coach{break-inside:avoid}}
@@ -130,6 +131,24 @@ Nothing has been guessed to fill a gap. See Section 20 for the verification reco
     {% if c.score is not none %}<div class="big"><b>{{ c.score }}</b><span>/10</span><small>Overall technique</small></div>{% endif %}
     <div class="cue-box"><small>Key coaching cue</small><p>"{{ c.cue }}"</p></div>
   </div>
+  {% set x = c.explanation %}{% if x %}
+  <div class="why"><h3>Score explanation</h3>
+    {% if x.meaning %}<p>{{ x.meaning }}</p>{% endif %}
+    <ul class="pts">
+      {% for l in x.lowered %}<li><b>Lowered it:</b> {{ l.text }} {% for r in l.refs %}{{ ref(r) }}{% endfor %}</li>{% endfor %}
+      {% for l in x.held_up %}<li><b>Held it up:</b> {{ l.text }} {% for r in l.refs %}{{ ref(r) }}{% endfor %}</li>{% endfor %}
+      {% if x.next %}<li><b>Biggest gain expected from:</b> {{ x.next.text }} {{ ref(x.next.ref) }}</li>{% endif %}
+    </ul>
+    {% if x.note %}<p class="care"><b>&#9888; Check this score:</b> {{ x.note }}</p>{% endif %}
+    <details><summary>How this score was reached</summary><div class="deep">
+      {% if x.steps %}<h3>Score for each step</h3>{{ bars(x.steps) }}{% endif %}
+      {% if x.areas %}<h3>Whole-shot areas</h3>{{ bars(x.areas) }}{% endif %}
+      {% if x.not_counted %}<h3>Not part of the score</h3><ul class="pts">{% for t in x.not_counted %}<li>{{ t }}</li>{% endfor %}</ul>{% endif %}
+      {% if x.assessor %}<h3>Assessor's note</h3><p>{{ txt(x.assessor) }}</p>{% endif %}
+      <p class="muted">The score is given against a fixed 0-10 rubric, the same for every
+      athlete and session. Details are in the Performance Scorecard section.</p>
+    </div></details>
+  </div>{% endif %}
   <p class="limit"><b>Before you read:</b> {{ c.limits|join(" ") }} Analysis confidence: {{ conf(c.confidence) }}</p>
   <div class="two">
     <div class="good"><h3>&#10003; Does well</h3><ol>{% for i in c.does_well %}<li>{{ i.text }} {{ ref(i.ref) }}</li>{% endfor %}</ol></div>

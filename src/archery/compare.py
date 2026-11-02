@@ -35,6 +35,13 @@ from pathlib import Path
 
 from archery.phase_defs import DISPLAY, ORDER
 
+# The shot itself: hook and grip to arrow release, the same two moments in
+# every shot of every video. Compared beside the phases under this code.
+CYCLE = "CYCLE"
+CYCLE_NAME = "Shot (hook to release)"
+OLD_RUN = ("analysed before hook-and-grip detection existed; timed from setup. "
+           "Re-run from S3 to time it from hook and grip")
+
 # Positions worth trending. Angles only travel between sessions filmed the same
 # way; anchor distance is normalised by shoulder width, so it travels further.
 POSITION_MEASURES = ["elbow_bow_deg", "elbow_draw_deg", "shoulder_bow_deg",
@@ -71,7 +78,7 @@ class Shot:
     xi: int = 0                      # column on the comparison axis
     phases: dict = field(default_factory=dict)      # code -> {duration_s, start, end, confidence}
     positions: dict = field(default_factory=dict)   # measure -> value at the AIM key frame
-    total_s: float | None = None
+    cycle: dict | None = None                       # hook and grip to release
 
 
 def _n(value):
@@ -134,14 +141,38 @@ def load_run(runs_dir: Path, run_id: str, order: int) -> tuple[Session, list[Sho
             if value is not None:
                 s.positions[name] = {"value": value, "confidence": d.get("confidence"),
                                      "reason": d.get("confidence_reason")}
-        spans = [p["duration_s"] for p in s.phases.values() if p["duration_s"] is not None]
-        s.total_s = round(sum(spans), 3) if spans else None
+        s.cycle = _cycle(entry, s.phases)
         shots.append(s)
 
     if not shots:
         raise CompareError(f"{run_id} contains no detected shots, so there is "
                            f"nothing to compare from it.")
     return session, shots
+
+
+def _cycle(entry: dict, phases: dict) -> dict | None:
+    """The shot span as S4 recorded it. A run from before S4 recorded it falls
+    back to the same rule S4 uses when it cannot see the hook: setup start to
+    release, LOW confidence, with the reason, so the start is never silently
+    different from the others."""
+    c = entry.get("cycle")
+    if c:
+        return {"start_t_s": _n(c.get("start_t_s")), "end_t_s": _n(c.get("end_t_s")),
+                "duration_s": _n(c.get("duration_s")), "start_event": c.get("start_event"),
+                "confidence": c.get("start_confidence"), "reason": c.get("reason")}
+    setup = phases.get("PRE_DRAW") or phases.get("DRAW")
+    end = _n(entry.get("release_t_s"))
+    if not setup or setup.get("start_t_s") is None or end is None:
+        return None
+    return {"start_t_s": setup["start_t_s"], "end_t_s": end,
+            "duration_s": round(end - setup["start_t_s"], 3),
+            "start_event": "SETUP_FALLBACK", "confidence": "LOW", "reason": OLD_RUN}
+
+
+def _duration(s: "Shot", code: str) -> float | None:
+    if code == CYCLE:
+        return (s.cycle or {}).get("duration_s")
+    return (s.phases.get(code) or {}).get("duration_s")
 
 
 def _mean_sd(values: list[float]) -> tuple[float | None, float | None]:
@@ -162,9 +193,8 @@ def baselines(shots: list[Shot], min_for_sd: int) -> dict:
     so the shot under test never contributes to the line it is measured against.
     """
     out: dict[str, dict] = {}
-    for code in ORDER:
-        rows = [(s.label, s.phases[code]["duration_s"]) for s in shots
-                if code in s.phases and s.phases[code]["duration_s"] is not None]
+    for code in ORDER + [CYCLE]:
+        rows = [(s.label, _duration(s, code)) for s in shots if _duration(s, code) is not None]
         if not rows:
             continue
         values = [v for _, v in rows]
@@ -188,7 +218,8 @@ def deviations(shots: list[Shot], base: dict, k: float) -> list[dict]:
     """Shots sitting beyond k leave-one-out SDs, worst first."""
     rows = []
     for s in shots:
-        for code, phase in s.phases.items():
+        spans = {**s.phases, **({CYCLE: s.cycle} if s.cycle else {})}
+        for code, phase in spans.items():
             b = (base.get(code) or {}).get("per_shot", {}).get(s.label)
             if not b or b["sd"] is None or not b["sd"] or b["value"] is None:
                 continue
@@ -197,7 +228,7 @@ def deviations(shots: list[Shot], base: dict, k: float) -> list[dict]:
                 continue
             rows.append({
                 "shot": s.label, "session": s.session_label, "athlete": s.athlete,
-                "phase": code, "phase_name": DISPLAY[code],
+                "phase": code, "phase_name": DISPLAY.get(code, CYCLE_NAME),
                 "duration_s": round(b["value"], 3),
                 "baseline_mean_s": round(b["mean"], 3),
                 "baseline_sd_s": round(b["sd"], 3),
@@ -373,7 +404,10 @@ def build(runs_dir: Path, run_ids: list[str], sd_k: float, min_for_sd: int) -> d
         "sessions": [vars(s) for s in sessions],
         "shots": [{**vars(s)} for s in shots],
         "phase_order": [c for c in ORDER if any(c in s.phases for s in shots)],
-        "phase_names": {c: DISPLAY[c] for c in ORDER},
+        "phase_names": {**{c: DISPLAY[c] for c in ORDER}, CYCLE: CYCLE_NAME},
+        "cycle_definition": "hook and grip to arrow release",
+        "cycle_fallbacks": [{"shot": s.label, "reason": (s.cycle or {}).get("reason")}
+                            for s in shots if (s.cycle or {}).get("start_event") == "SETUP_FALLBACK"],
         "baselines": base,
         "deviations": deviations(shots, base, sd_k),
         "comparability": comp,

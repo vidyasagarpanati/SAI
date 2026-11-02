@@ -11,12 +11,13 @@ from __future__ import annotations
 import json
 import mimetypes
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from archery import __version__, io_guard
+from archery import __version__, io_guard, trash
 from archery.config import load_config
 from archery.runstate import STEP_NAMES, STEP_ORDER
 from archery.web import library as lib
@@ -76,6 +77,64 @@ def create_app(root: Path | None = None, video_folder: Path | None = None,
                     athletes=sorted({r.athlete for r in all_runs}),
                     statuses=sorted({r.status for r in all_runs}),
                     athlete=athlete, status=status, total=len(all_runs))
+
+    # --------------------------------------------------------------- delete
+    def same_origin(request: Request) -> None:
+        """Deleting is a POST a stranger's web page could also send to this
+        loopback server. A browser names the page it came from; refuse others."""
+        origin = request.headers.get("origin") or request.headers.get("referer")
+        if origin:
+            from urllib.parse import urlsplit
+            if urlsplit(origin).netloc != request.headers.get("host"):
+                raise HTTPException(403, "Refused: this request did not come from this app.")
+
+    @app.post("/runs/delete")
+    def delete_runs(request: Request, runs_selected: list[str] = Form(default=[])):
+        same_origin(request)
+        busy = {j.run_id for j in app.state.queue.active() if j.run_id}
+        moved, refused = [], []
+        for run_id in dict.fromkeys(runs_selected):
+            if run_id in busy:
+                refused.append(f"{run_id}: still being analysed")
+                continue
+            try:
+                moved.append(trash.delete(runs_root, outputs_root, run_id).run_id)
+            except (lib.NotFound, lib.Unsafe, OSError) as exc:
+                refused.append(f"{run_id}: {exc}")
+        return page(request, "deleted.html.j2", items=trash.listing(runs_root),
+                    moved=moved, refused=refused)
+
+    @app.get("/deleted", response_class=HTMLResponse)
+    def deleted_page(request: Request):
+        return page(request, "deleted.html.j2", items=trash.listing(runs_root),
+                    moved=[], refused=[])
+
+    @app.post("/deleted/{trash_id}/restore")
+    def restore_run(request: Request, trash_id: str):
+        same_origin(request)
+        try:
+            run_id = trash.restore(runs_root, outputs_root, trash_id)
+        except (lib.NotFound, lib.Unsafe) as exc:
+            raise HTTPException(404, str(exc)) from exc
+        except FileExistsError as exc:
+            return page(request, "deleted.html.j2", items=trash.listing(runs_root),
+                        moved=[], refused=[str(exc)])
+        return RedirectResponse(f"/run/{quote(run_id)}", 303)
+
+    @app.post("/deleted/{trash_id}/purge")
+    def purge_run(request: Request, trash_id: str):
+        same_origin(request)
+        try:
+            trash.purge(runs_root, trash_id)
+        except (lib.NotFound, lib.Unsafe) as exc:
+            raise HTTPException(404, str(exc)) from exc
+        return RedirectResponse("/deleted", 303)
+
+    @app.post("/deleted/empty")
+    def empty_deleted(request: Request):
+        same_origin(request)
+        trash.empty(runs_root)
+        return RedirectResponse("/deleted", 303)
 
     # ------------------------------------------------------------ run detail
     @app.get("/run/{run_id}", response_class=HTMLResponse)

@@ -101,6 +101,9 @@ footer{color:var(--muted);font-size:12px;text-align:center;margin-top:30px}
   <h2>Shot timeline</h2>
   {{ v.timeline }}
   {{ v.timeline_legend }}
+  {% if v.payload.cycle_fallbacks %}<div class="warn">Timed from setup, not hook and grip, so
+    these starts are LOW confidence and compare less exactly:
+    {% for f in v.payload.cycle_fallbacks %}<b>{{ f.shot }}</b> ({{ f.reason }}){% if not loop.last %}; {% endif %}{% endfor %}</div>{% endif %}
 </section>
 
 <section>
@@ -159,13 +162,17 @@ footer{color:var(--muted);font-size:12px;text-align:center;margin-top:30px}
   checking a chart against a number.</p>
   <table><tr><th>Shot</th><th>Session</th>{% if v.multi_athlete %}<th>Athlete</th>{% endif %}
     {% for c in v.payload.phase_order %}<th>{{ v.payload.phase_badges[c] }}</th>{% endfor %}
-    <th>Total</th></tr>
+    <th>Shot start</th><th>Release</th><th>Shot time</th><th>Start seen as</th></tr>
   {% for s in v.payload.shots %}<tr><td>{{ s.label }}</td><td>{{ s.session_label }}</td>
     {% if v.multi_athlete %}<td>{{ s.athlete }}</td>{% endif %}
     {% for c in v.payload.phase_order %}<td class="num">{% if c in s.phases and s.phases[c].duration_s is not none %}{{ "%.3f"|format(s.phases[c].duration_s) }}{% else %}<span class="na">not detected</span>{% endif %}</td>{% endfor %}
-    <td class="num">{{ "%.3f"|format(s.total_s) if s.total_s is not none else "n/a" }}</td></tr>{% endfor %}
+    {% set c = s.cycle or {} %}{% for key in ("start_t_s", "end_t_s", "duration_s") %}<td class="num">{{ "%.3f"|format(c[key]) if c[key] is not none else "n/a" }}</td>{% endfor %}
+    <td>{% if c.start_event == "SETUP_FALLBACK" %}<span class="chip c-LOW">setup (hook not seen)</span>{% elif c.start_event %}{{ "hook and grip" if c.start_event == "HOOK_GRIP" else c.start_event|lower }}{% else %}<span class="na">n/a</span>{% endif %}</td></tr>{% endfor %}
   </table>
-  <p class="cap">Durations in seconds. Badges: {% for c in v.payload.phase_order %}<b>{{ v.payload.phase_badges[c] }}</b> {{ v.payload.phase_names[c] }}{% if not loop.last %}, {% endif %}{% endfor %}.</p>
+  <p class="cap">Durations in seconds. Shot start and release are seconds into that video;
+  shot time is hook and grip to arrow release, the one span measured the same way in every
+  shot. Phase columns keep each phase whole, so Stance includes time spent standing before
+  the hook. Badges: {% for c in v.payload.phase_order %}<b>{{ v.payload.phase_badges[c] }}</b> {{ v.payload.phase_names[c] }}{% if not loop.last %}, {% endif %}{% endfor %}.</p>
 
   <h3>Provenance</h3>
   <div class="kv">{% for k, val in v.provenance %}<div>{{ k }}</div><div>{{ val }}</div>{% endfor %}</div>

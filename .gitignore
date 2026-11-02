@@ -7,3 +7,5 @@ models/*.task
 .DS_Store
 *.egg-info/
 .pytest_cache/
+# Coaching books and sample reports: large, and not ours to redistribute.
+reference_documents/

@@ -256,8 +256,9 @@ def test_every_number_on_a_chart_is_in_the_evidence_file(two_runs, tmp_path):
         for code, ph in s["phases"].items():
             if ph["duration_s"] is not None:
                 filed.add(f'{ph["duration_s"]:.3f}')
-        if s["total_s"] is not None:
-            filed.add(f'{s["total_s"]:.3f}')
+        for key in ("start_t_s", "end_t_s", "duration_s"):
+            if (s["cycle"] or {}).get(key) is not None:
+                filed.add(f'{s["cycle"][key]:.3f}')
     assert filed
     # Every duration printed in the data table came from the evidence file.
     import re
@@ -313,3 +314,59 @@ def test_low_confidence_boundaries_survive_into_the_payload(two_runs):
     p = build(two_runs, ["wk1__aaaa", "wk2__bbbb"], 2.0, 3)
     confs = {ph.get("confidence") for s in p["shots"] for ph in s["phases"].values()}
     assert confs and confs <= {"HIGH", "MEDIUM", "LOW", None}
+
+
+# ------------------------------------------------- the shot: hook to release
+def test_a_shot_is_timed_from_hook_and_grip_to_release(tmp_path):
+    """The start is the archer hooking the string and gripping the bow, the end
+    is the arrow release, so every shot in every video spans the same moments."""
+    df, truth = synthetic.build(hook=True)
+    ctx = make_run(tmp_path / "hooked__aaaa", df, truth["fps"])
+    for step in (s03_kinematics, s04_phases, s05_stats):
+        assert step.run(ctx).passed
+    m = json.loads((ctx.run_dir / "05_metrics.json").read_text())
+    c = m["per_shot"][0]["cycle"]
+    assert c["start_event"] == "HOOK_GRIP"
+    assert 0.2 <= c["start_t_s"] <= 0.45, c            # hand reaches the string 0.2-0.4 s
+    assert abs(c["end_t_s"] - truth["phases_s"]["release_s"]) < 0.1
+    assert c["duration_s"] == pytest.approx(c["end_t_s"] - c["start_t_s"], abs=0.04)
+    assert "shot1.cycle.duration_s" in m["evidence_index"]
+
+
+def test_an_unseen_hook_falls_back_to_setup_and_says_so(two_runs):
+    p = build(two_runs, ["wk1__aaaa", "wk2__bbbb"], 2.0, 3)
+    for s in p["shots"]:
+        c = s["cycle"]
+        assert c["start_event"] == "SETUP_FALLBACK" and c["confidence"] == "LOW"
+        assert c["start_t_s"] == s["phases"]["PRE_DRAW"]["start_t_s"]
+        assert c["duration_s"] == pytest.approx(c["end_t_s"] - c["start_t_s"], abs=0.002)
+    assert len(p["cycle_fallbacks"]) == len(p["shots"])
+    assert "CYCLE" in p["baselines"]
+
+
+def test_a_run_from_before_shot_timing_still_compares_on_the_same_rule(two_runs, tmp_path):
+    """Older 05_metrics.json files have no cycle. They are timed by S4's own
+    fallback rule and flagged, never by summing phases as before."""
+    import shutil
+    runs = tmp_path / "runs"
+    shutil.copytree(two_runs / "wk1__aaaa", runs / "old__cccc")
+    path = runs / "old__cccc" / "05_metrics.json"
+    m = json.loads(path.read_text())
+    for sh in m["per_shot"]:
+        sh.pop("cycle", None)
+    path.write_text(json.dumps(m))
+    p = build(runs, ["old__cccc"], 2.0, 3)
+    for s in p["shots"]:
+        assert s["cycle"]["start_event"] == "SETUP_FALLBACK"
+        assert "Re-run from S3" in s["cycle"]["reason"]
+
+
+def test_the_report_shows_shot_start_release_and_time(two_runs, tmp_path):
+    io_guard.configure([two_runs, tmp_path])
+    p = build(two_runs, ["wk1__aaaa", "wk2__bbbb"], 2.0, 3)
+    target, _ = render(p, tmp_path / "outputs", tmp_path / "ev", "t")
+    html = target.read_text(encoding="utf-8")
+    assert ">Shot time<" in html and ">Release<" in html and ">Total<" not in html
+    assert "setup (hook not seen)" in html
+    shot = p["shots"][0]
+    assert f'{shot["cycle"]["duration_s"]:.2f}s*' in html      # timeline label, flagged

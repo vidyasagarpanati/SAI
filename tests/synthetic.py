@@ -29,7 +29,9 @@ def _ease(t: float) -> float:
     return float(np.clip(t, 0.0, 1.0) ** 2 * (3 - 2 * np.clip(t, 0.0, 1.0)))
 
 
-def build(seed: int = 7, noise: float = 0.0015) -> tuple[pd.DataFrame, dict]:
+def build(seed: int = 7, noise: float = 0.0015, hook: bool = False) -> tuple[pd.DataFrame, dict]:
+    """``hook`` adds hooking and gripping: from 0.4 s to 1.0 s the draw hand rests
+    on the string beside the bow hand, then rises with it into setup."""
     rng = np.random.default_rng(seed)
     n = int(FPS * DURATION_S)
     t = np.arange(n) / FPS
@@ -90,6 +92,13 @@ def build(seed: int = 7, noise: float = 0.0015) -> tuple[pd.DataFrame, dict]:
     anchor_wrist = mouth + np.array([0.030, 0.006])
     pts[:, ID["RIGHT_WRIST"]] = (
         start_wrist + (anchor_wrist - start_wrist) * anchor_p[:, None])
+    if hook:
+        at_string = down_wrist + np.array([0.03, -0.02])
+        w = np.array([_ease((ti - 0.2) / 0.2) if ti < 1.0 else 1.0 - _ease((ti - 1.0) / 0.6)
+                      for ti in t])
+        w[t >= 1.6] = 0.0
+        pts[:, ID["RIGHT_WRIST"]] = (pts[:, ID["RIGHT_WRIST"]] * (1 - w[:, None])
+                                     + at_string * w[:, None])
 
     sh_r = np.array(base["RIGHT_SHOULDER"])
     elbow_lift = 0.06 * anchor_p

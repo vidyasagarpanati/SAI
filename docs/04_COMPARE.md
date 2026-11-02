@@ -156,3 +156,17 @@ dark (all checks pass).
 - The deviation marker escaped the plot area onto the panel title. It is
   clamped, and a panel with flags gets extra headroom.
 - The x-axis title collided with the first tick. It moved into the caption.
+
+## Shot time: hook and grip to release
+
+Every shot is timed between the same two moments: hooking and gripping
+(USA Archery / KiSik Lee National Training System step 3) and the arrow release
+(step 12). S4 reads hook and grip as the draw hand resting at the string beside
+the bow hand, both still, shortly before the bow arm rises (`shot_cycle` in
+`config/phase_rules.yaml`; tune it from `signal_summary.hand_gap_norm` in
+`04_phases.json`). When it is not seen, the shot is timed from setup, marked
+LOW confidence, and listed under the timeline. The timeline draws only the shot;
+the phase panels keep each phase whole, so Stance still includes waiting time.
+Runs analysed before this existed are timed from setup and flagged; re-run them
+from S3 to time them from hook and grip.
+

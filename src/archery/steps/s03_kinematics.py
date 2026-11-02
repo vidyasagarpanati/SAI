@@ -282,6 +282,13 @@ def run(ctx: Context) -> StepResult:
     reasons["anchor_distance_norm"] = r
     gated.append("anchor_distance_norm")
 
+    # Draw hand to bow hand. Small and still just before setup = the archer has
+    # nocked, hooked the string and gripped the bow: where S4 starts the shot.
+    u, r = _gate(vis, [draw["wrist"], bow["wrist"], sh_l, sh_r], min_conf, frame_ok)
+    out["hand_gap_norm"] = np.where(u, G.distance(draw_wrist, bow_wrist) / shoulder_width, np.nan)
+    reasons["hand_gap_norm"] = r
+    gated.append("hand_gap_norm")
+
     # Speeds are differentiated from SMOOTHED positions. Differencing raw landmark
     # positions amplifies MediaPipe's frame-to-frame jitter and reports noise as
     # movement (found by inspecting rendered frames: a held aim read ~1 SW/s).

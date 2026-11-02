@@ -157,7 +157,7 @@ def named_run(site):
         return dst
     yield make, base, client
     for d in made:
-        shutil.rmtree(d)
+        shutil.rmtree(d, ignore_errors=True)      # a test may have deleted it already
 
 
 @pytest.mark.parametrize("run_id", ["Deepika (1)__6e63fd04", "Final shot, day 2__11111111",
@@ -428,3 +428,121 @@ def test_the_queue_page_shows_the_stage_and_keeps_the_log_line_as_a_tooltip(site
         except LookupError:
             pass
         q.shutdown()
+
+
+# ------------------------------------------------ deleting runs, recoverably
+def test_deleting_a_run_moves_it_and_its_reports_and_restore_puts_them_back(named_run):
+    from archery import trash
+    make, base, client = named_run
+    src = make("Old try (2)__77777777")
+    state = json.loads((src / "state.json").read_text())
+    # Give this copy its own report, recorded the way S10 records one.
+    own = base / "outputs" / "Archery_Report_Old_try_v01.html"
+    own.write_text("<html>old</html>")
+    own.with_suffix(".html.sha256").write_text("x  " + own.name)
+    state["steps"]["S10"]["outputs"]["report"] = str(own)
+    state["steps"]["S10"]["outputs"]["sha256"] = str(own.with_suffix(".html.sha256"))
+    (src / "state.json").write_text(json.dumps(state))
+    video = base / "videos" / "new_one.mov"
+
+    r = client.post("/runs/delete", data={"runs_selected": ["Old try (2)__77777777"]})
+    assert r.status_code == 200 and "1 run(s) moved here" in r.text
+    assert not src.exists() and not own.exists() and not own.with_suffix(".html.sha256").exists()
+    assert video.is_file()                                   # sources are never touched
+    assert "Old try (2)__77777777" not in client.get("/").text
+    [d] = [x for x in trash.listing(base / "runs") if x.run_id == "Old try (2)__77777777"]
+    assert set(d.files) == {own.name, own.name + ".sha256"}
+
+    r = client.post(f"/deleted/{quote(d.trash_id)}/restore", follow_redirects=False)
+    assert r.status_code == 303
+    assert (src / "state.json").is_file() and own.is_file()
+    assert client.get("/artefact/report/" + quote("Old try (2)__77777777")).text == "<html>old</html>"
+
+
+def test_delete_only_takes_what_that_run_produced(named_run):
+    """Another run's report, compare reports and the shared folders stay put."""
+    make, base, client = named_run
+    make("solo__88888888")
+    keep = sorted((base / "outputs").glob("Archery_Report_*.html"))
+    client.post("/runs/delete", data={"runs_selected": ["solo__88888888"]})
+    # The copy shares kalpana's recorded report path; that report is kalpana's.
+    # It goes with the copy only because state.json names it. Put it back.
+    from archery import trash
+    [d] = [x for x in trash.listing(base / "runs") if x.run_id == "solo__88888888"]
+    trash.restore(base / "runs", base / "outputs", d.trash_id)
+    assert sorted((base / "outputs").glob("Archery_Report_*.html")) == keep
+    assert (base / "runs" / "kalpana__aaaa" / "state.json").is_file()
+
+
+def test_erasing_is_permanent_and_needs_the_deleted_page(named_run):
+    from archery import trash
+    make, base, client = named_run
+    make("gone__99999999")
+    client.post("/runs/delete", data={"runs_selected": ["gone__99999999"]})
+    [d] = [x for x in trash.listing(base / "runs") if x.run_id == "gone__99999999"]
+    assert d.trash_id in client.get("/deleted").text
+    client.post(f"/deleted/{quote(d.trash_id)}/purge")
+    assert not d.path.exists() and not (base / "runs" / "gone__99999999").exists()
+
+
+def test_a_run_being_analysed_cannot_be_deleted(named_run):
+    from archery.web.jobs import RUNNING
+    make, base, client = named_run
+    make("busy__12121212")
+    job = client.app.state.queue.submit(Path("/tmp/busy.mov"))
+    job.status, job.run_id = RUNNING, "busy__12121212"
+    try:
+        r = client.post("/runs/delete", data={"runs_selected": ["busy__12121212"]})
+        assert "still being analysed" in r.text
+        assert (base / "runs" / "busy__12121212").is_dir()
+    finally:
+        job.status = "CANCELLED"
+        client.app.state.queue.shutdown()
+
+
+def test_a_delete_from_another_site_is_refused(named_run):
+    make, base, client = named_run
+    make("target__13131313")
+    r = client.post("/runs/delete", data={"runs_selected": ["target__13131313"]},
+                    headers={"origin": "https://evil.example"})
+    assert r.status_code == 403 and (base / "runs" / "target__13131313").is_dir()
+
+
+@pytest.mark.parametrize("bad", ["..", "_deleted", "_compare", "../runs"])
+def test_only_runs_can_be_deleted(site, bad):
+    from archery import trash
+    base, _ = site
+    (base / "runs" / "_compare").mkdir(exist_ok=True)
+    with pytest.raises((lib.Unsafe, lib.NotFound)):
+        trash.delete(base / "runs", base / "outputs", bad)
+
+
+def test_no_pipeline_step_can_reach_the_delete_code():
+    """io_guard's promise: the pipeline never removes anything. Only a person,
+    through the CLI or the web UI, reaches archery.trash."""
+    pkg = ROOT / "src" / "archery"
+    allowed = {pkg / "trash.py", pkg / "cli.py", pkg / "web" / "app.py"}
+    for py in pkg.rglob("*.py"):
+        if py in allowed:
+            continue
+        src = py.read_text()
+        assert "import trash" not in src and "archery.trash" not in src, py.name
+        assert not re.search(r"shutil\.(move|rmtree)|os\.remove|\.unlink\(", src), py.name
+
+
+def test_the_annotated_video_is_offered_when_s7_published_one(site):
+    """S7 records its output as published_video; the library used to look for
+    'video' and so never showed the Video button."""
+    base, _ = site
+    state = base / "runs" / "kalpana__aaaa" / "state.json"
+    data = json.loads(state.read_text())
+    clip = base / "outputs" / "Kalpana_annotated_v01.mp4"
+    clip.write_bytes(b"\x00")
+    data["steps"]["S7"] = {"status": "DONE", "outputs": {"published_video": str(clip)}}
+    state.write_text(json.dumps(data))
+    try:
+        assert lib.load_run(base / "runs", "kalpana__aaaa", base / "outputs").video == clip.resolve()
+    finally:
+        data["steps"].pop("S7")
+        state.write_text(json.dumps(data))
+        clip.unlink()

@@ -1,0 +1,34 @@
+{% extends "base.html.j2" %}{% set nav = "deleted" %}
+{% block title %}Deleted - SAI Archery{% endblock %}
+{% block body %}
+<section>
+  <h2>Deleted runs</h2>
+  {% if moved %}<div class="banner good">{{ moved|length }} run(s) moved here: {{ moved|join(", ") }}.
+    Restore any of them below.</div>{% endif %}
+  {% for r in refused %}<div class="banner">Not done: {{ r }}</div>{% endfor %}
+  <p class="muted">A deleted run keeps its analysis and its reports until this list is
+    emptied. Restore puts everything back where it was. Source videos and session files
+    are never moved or erased.</p>
+  {% if items %}
+  <table>
+    <tr><th>Athlete</th><th>Run</th><th>Deleted</th><th>Files from outputs</th><th></th></tr>
+    {% for d in items %}
+    <tr><td>{{ d.athlete }}</td><td>{{ d.run_id }}</td><td>{{ d.deleted_at|replace("T", " ") }}</td>
+      <td>{% if d.files %}{{ d.files|join(", ") }}{% else %}<span class="na">none</span>{% endif %}</td>
+      <td style="white-space:nowrap">
+        <form method="post" action="/deleted/{{ d.trash_id|urlencode }}/restore" style="display:inline">
+          <button class="btn sm" type="submit">Restore</button></form>
+        <form method="post" action="/deleted/{{ d.trash_id|urlencode }}/purge" style="display:inline"
+              onsubmit="return confirm('Erase {{ d.run_id|e }} for good? This cannot be undone.')">
+          <button class="btn sm ghost" type="submit">Erase</button></form>
+      </td></tr>
+    {% endfor %}
+  </table>
+  <form method="post" action="/deleted/empty"
+        onsubmit="return confirm('Erase all {{ items|length }} deleted run(s) for good? This cannot be undone.')">
+    <button class="btn ghost" type="submit">Empty Deleted</button></form>
+  {% else %}
+  <p class="na">Nothing has been deleted.</p>
+  {% endif %}
+</section>
+{% endblock %}

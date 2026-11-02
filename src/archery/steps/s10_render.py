@@ -225,6 +225,12 @@ def build_view(ctx: Context, version_label: str) -> tuple[dict, int, int]:
         timing_rows.append({"phase": DISPLAY[code], "n": t["n_shots"], "durations": ", ".join(map(str, t["values_s"])),
                             "mean": t.get("mean_s", "—"), "sd": t.get("sd_s", "—"),
                             "cv": f"{t['cv_pct']}%" if t.get("cv_pct") is not None else (t.get("status") and "n/a" or "—")})
+    ct = m.get("shot_cycle_timing") or {}
+    if ct.get("n_shots"):
+        timing_rows.append({"phase": "Whole shot: hook and grip to release", "n": ct["n_shots"],
+                            "durations": ", ".join(map(str, ct["values_s"])),
+                            "mean": ct.get("mean_s", "—"), "sd": ct.get("sd_s", "—"),
+                            "cv": f"{ct['cv_pct']}%" if ct.get("cv_pct") is not None else "n/a"})
     r = m["consistency_rankings"]
     if r.get("status"):
         rankings = [("Most / least consistent phase, largest variations", r["status"])]
@@ -346,7 +352,8 @@ def build_view(ctx: Context, version_label: str) -> tuple[dict, int, int]:
     }
     view["n_shots"] = sess["n_shots"]
     view["groups"] = list(dict.fromkeys(s["group"] for s in view["order"]))
-    view["summaries"], view["coach"] = build_summaries(view, ev)
+    view["summaries"], view["coach"] = build_summaries(
+        view, ev, (ctx.cfg.prompts or {}).get("scoring_rubric", ""))
     return view, n_img, n_missing
 
 

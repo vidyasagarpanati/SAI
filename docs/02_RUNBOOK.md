@@ -352,3 +352,25 @@ The wording comes from four model calls (`sum_overview`, `sum_technique`,
 If one is rejected, those sections use plainer text built from the data and the
 report stays complete. S8 logs `rejected; the report uses data-built summaries`.
 To reword an older run: `archery run --video <path> --from S8`.
+
+The **Score explanation** under the overall score says where the score sits on
+the 0-10 rubric (`config/prompts/scoring_rubric.md`), which errors lowered it,
+what held it up, what could not count, and the plan's first priority. If the
+score is higher than the rubric allows for the errors found, it says so.
+
+## Deleting runs
+
+Tick runs on the Runs page and press **Delete ticked runs**, or:
+
+    archery delete "<run id>" ["<run id>" ...]
+    archery deleted                  # list what was deleted
+    archery restore "<deleted id>"   # put one back
+    archery deleted --empty --yes    # erase everything in Deleted for good
+
+A delete moves the run folder and the files it produced in `outputs/` (its
+reports, checksums, manifests and published video) into `runs/_deleted/`.
+Restore puts them back and refuses if something of the same name exists again.
+Source videos and session files are never moved or erased. A run still being
+analysed cannot be deleted; from the CLI, a run whose state says RUNNING needs
+`--force` (use it only when that run crashed).
+

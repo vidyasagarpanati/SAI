@@ -24,7 +24,7 @@
   {% if runs %}
   <form method="post" action="/compare">
   <table>
-    <tr><th style="width:34px"></th><th>Athlete</th><th>Video</th><th>Session date</th>
+    <tr><th style="width:34px"><input type="checkbox" id="tick-all" aria-label="Tick every run shown"></th><th>Athlete</th><th>Video</th><th>Session date</th>
       <th>Shots</th><th>Status</th><th>Steps</th><th>Time</th><th>Open</th></tr>
     {% for date, bucket in (groups if groups else [(none, runs)]) %}
     {% if date %}<tr><td colspan="9" style="background:var(--chip);font-weight:600">{{ date }}
@@ -55,11 +55,29 @@
       <input type="number" step="0.5" min="0.5" max="6" name="sd" id="sd" value="2.0" style="width:110px"></div>
     <button class="btn" type="submit">Compare ticked runs</button>
     <span class="muted">One run compares its own shots. Several pool them, in the order they appear here.</span>
+    <button class="btn ghost" type="submit" formaction="/runs/delete" id="delete-ticked"
+            style="margin-left:auto">Delete ticked runs</button>
   </div>
+  <p class="muted">Deleting moves a run and its reports to <a href="/deleted">Deleted</a>,
+    where it can be restored. The source video is never touched.</p>
   </form>
   {% else %}
   <p class="na">No runs yet{% if athlete or status %} matching that filter{% endif %}.
     <a href="/new">Analyse a video</a> to make one.</p>
   {% endif %}
 </section>
+{% endblock %}
+{% block script %}
+<script>
+const all = document.getElementById("tick-all");
+const boxes = () => document.querySelectorAll('input[name="runs_selected"]');
+if(all) all.addEventListener("change", () => boxes().forEach(b => b.checked = all.checked));
+const del = document.getElementById("delete-ticked");
+if(del) del.addEventListener("click", e => {
+  const ticked = [...boxes()].filter(b => b.checked).map(b => b.value);
+  if(!ticked.length){ e.preventDefault(); alert("Tick the runs to delete first."); return; }
+  if(!confirm(`Move ${ticked.length} run(s) and their reports to Deleted?\n\n` + ticked.join("\n")
+              + "\n\nThey can be restored from the Deleted page.")) e.preventDefault();
+});
+</script>
 {% endblock %}
