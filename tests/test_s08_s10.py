@@ -157,6 +157,30 @@ def test_partial_report_is_published_and_marked(tmp_path):
     assert "{{" not in html
 
 
+class _AlwaysUnknownKey(FakeLLM):
+    def chat_json(self, system, user, schema, images=None, attempt=0):
+        out = super().chat_json(system, user, schema, images, attempt)
+        if "SECTION: s13_strengths" in user:
+            out["items"][0]["evidence"] = "Held steady at {{shot9.made_up.key}}."
+        return out
+
+
+def test_failure_reason_quoting_a_placeholder_does_not_fail_s10(tmp_path):
+    """The NOT AVAILABLE box shows the validator's reason, which quotes the
+    unknown key in braces. That used to leave '{{' in the HTML and fail S10's
+    own no_unresolved_placeholders check on a report that was fine."""
+    ctx = _prepare(tmp_path, "unknown_key")
+    ctx.llm = _AlwaysUnknownKey()
+    assert s08_narrate.run(ctx).passed
+    status = json.loads((ctx.narrative_dir / "section_status.json").read_text())
+    assert "{{" in status["s13_strengths"]["problems"][0]
+    s09_verify.run(ctx)
+    r10 = s10_render.run(ctx)
+    assert r10.passed, [f"{c.name}: {c.detail}" for c in r10.failures]
+    html = Path(r10.outputs["report"]).read_text()
+    assert "{{" not in html and "shot9.made_up.key" in html
+
+
 def test_retry_prompts_differ_so_a_cached_answer_is_not_reused(tmp_path):
     """Retries used to repeat the identical prompt, hit the response cache and
     return the identical rejected answer three times."""

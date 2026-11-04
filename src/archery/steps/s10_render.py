@@ -27,7 +27,7 @@ from archery import __version__
 from archery.context import Context
 from archery.contracts import StepResult
 from archery.framedata import FrameData
-from archery.grounding import format_value, substitute, substitute_all
+from archery.grounding import PLACEHOLDER, format_value, substitute, substitute_all
 from archery.io_guard import guarded_open, guarded_path
 from archery.phase_defs import BADGE, COLOR_BGR, DISPLAY, ORDER
 from archery.report_spec import CATEGORIES, CORE, LOWER, report_order
@@ -99,7 +99,10 @@ def build_view(ctx: Context, version_label: str) -> tuple[dict, int, int]:
         st = status.get(call_id) or {}
         classes = ", ".join(st.get("classes") or []) or "not produced"
         first = (st.get("problems") or ["no further detail recorded"])[0]
-        return f"{classes}: {first}"
+        # Validator messages quote the offending placeholder, braces and all.
+        # Shown verbatim they would read as an unsubstituted placeholder, so the
+        # key is shown in quotes instead.
+        return PLACEHOLDER.sub(lambda mm: f'"{mm.group(1)}"', f"{classes}: {first}")
 
     failed_sections = {key: _why(src) for key, src in SECTION_SOURCE.items()
                        if src not in n or (src == "s04_phase" and not n.get(src))}
@@ -110,9 +113,13 @@ def build_view(ctx: Context, version_label: str) -> tuple[dict, int, int]:
         val = athlete.get(key)
         return NP if val in (None, "", NP) else str(val)
 
+    slow = float(sess.get("slow_motion_factor") or 1.0)
     info = [("Athlete", a("athlete_name")), ("Archery Discipline", a("discipline")),
             ("Bow Type", a("bow_type")), ("Video Duration", f"{sess['duration_s']} s" if sess["duration_s"] else None),
-            ("Video Frame Rate", f"{sess['measured_fps']} fps (measured); analysed at {sess['analysis_fps']:g} fps"),
+            ("Video Frame Rate", f"{sess['measured_fps']} fps (measured); analysed at {sess['analysis_fps']:g} fps"
+             + (" of real time" if slow > 1 else "")),
+            ("Video Speed", f"Slow motion x{slow:g}: every time in this report is real time, "
+                            f"the video's own clock divided by {slow:g}" if slow > 1 else "Normal"),
             ("Camera View", a("camera_view")), ("Number of Shots", str(sess["n_shots"])),
             ("Analysis Method", sess["analysis_method"]), ("Pose Estimation Method", sess["pose_estimation"])]
     declared = athlete.get("declared_frame_rate")
@@ -407,7 +414,11 @@ def run(ctx: Context) -> StepResult:
     external = re.findall(r'(?:src|href)\s*=\s*["\'](?:https?:)?//|url\(\s*["\']?https?:|@import', html)
     res.check("self_contained", not external, f"External references found: {external[:5]}" if external
               else "No external CSS, scripts, fonts or images.")
-    res.check("no_unresolved_placeholders", "{{" not in html, "All evidence placeholders substituted.")
+    left = [html[max(0, i - 60):i + 60].replace("\n", " ")
+            for i in (mm.start() for mm in re.finditer(r"\{\{", html))][:3]
+    res.check("no_unresolved_placeholders", not left,
+              f"Unsubstituted placeholder text in the report near: {left}" if left
+              else "All evidence placeholders substituted.")
     order_found = re.findall(r'<section id="sec-(\w+)"', html)
     expected = ["info"] + [s["key"] for s in view["order"]]
     res.check("sections_present_in_order", order_found == expected,

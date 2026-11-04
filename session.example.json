@@ -12,6 +12,7 @@
   "session_date": "2026-08-13",
   "declared_frame_rate": null,
   "number_of_shots_expected": null,
+  "slow_motion_factor": 1,
   "additional_data": [],
   "notes": "",
   "inputs_raw": null,

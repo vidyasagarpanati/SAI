@@ -21,6 +21,9 @@ class FrameData:
     kin: pd.DataFrame
     phases: dict
     metrics: dict | None
+    # Frames per second of the VIDEO FILE's own time. Equal to fps except for
+    # slow motion, where fps is the real-time rate and this is what plays back.
+    play_fps: float | None = None
 
     @classmethod
     def load(cls, run_dir: Path, with_metrics: bool = True) -> "FrameData":
@@ -38,7 +41,9 @@ class FrameData:
         mp = run_dir / "05_metrics.json"
         if with_metrics and mp.is_file():
             metrics = json.loads(mp.read_text(encoding="utf-8"))
-        return cls(frames, float(fm["analysis_fps"]), w, h, xy, vis, kin, phases, metrics)
+        fps = float(fm["analysis_fps"])
+        return cls(frames, fps, w, h, xy, vis, kin, phases, metrics,
+                   float(fm.get("decode_fps") or fps))
 
     def shoulder_width_px(self) -> float:
         from archery.landmarks import ID

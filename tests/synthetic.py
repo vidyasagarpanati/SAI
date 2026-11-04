@@ -29,9 +29,17 @@ def _ease(t: float) -> float:
     return float(np.clip(t, 0.0, 1.0) ** 2 * (3 - 2 * np.clip(t, 0.0, 1.0)))
 
 
-def build(seed: int = 7, noise: float = 0.0015, hook: bool = False) -> tuple[pd.DataFrame, dict]:
+def build(seed: int = 7, noise: float = 0.0015, hook: bool = False,
+          letdown: bool = False, flicker_s: tuple[float, float] | None = None
+          ) -> tuple[pd.DataFrame, dict]:
     """``hook`` adds hooking and gripping: from 0.4 s to 1.0 s the draw hand rests
-    on the string beside the bow hand, then rises with it into setup."""
+    on the string beside the bow hand, then rises with it into setup.
+
+    ``letdown`` replaces the release with a let-down: from 3.5 s the draw hand
+    eases back off the face over a second with no snap, and the bow comes down.
+
+    ``flicker_s`` throws the draw wrist off the face for that window during the
+    hold, the way a tracking glitch does, without the archer moving."""
     rng = np.random.default_rng(seed)
     n = int(FPS * DURATION_S)
     t = np.arange(n) / FPS
@@ -67,6 +75,12 @@ def build(seed: int = 7, noise: float = 0.0015, hook: bool = False) -> tuple[pd.
         else:
             elev[i] = 1.0 - _ease((ti - 4.1) / 0.9)
 
+    if letdown:
+        # Bow comes down with the let-down instead of holding a follow-through.
+        for i, ti in enumerate(t):
+            if ti >= 3.5:
+                elev[i] = 1.0 - _ease((ti - 3.5) / 1.0)
+
     sh_l = np.array(base["LEFT_SHOULDER"])
     down_wrist = sh_l + np.array([-0.02, 0.30])
     up_wrist = sh_l + np.array([-0.24, -0.01])
@@ -82,6 +96,8 @@ def build(seed: int = 7, noise: float = 0.0015, hook: bool = False) -> tuple[pd.
             anchor_p[i] = _ease((ti - 1.6) / 0.8)
         elif ti < 3.5:
             anchor_p[i] = 1.0
+        elif letdown:
+            anchor_p[i] = 1.0 - _ease((ti - 3.5) / 1.0)
         elif ti < 3.6:
             anchor_p[i] = 1.0 - _ease((ti - 3.5) / 0.1) * 1.6
         else:
@@ -99,6 +115,10 @@ def build(seed: int = 7, noise: float = 0.0015, hook: bool = False) -> tuple[pd.
         w[t >= 1.6] = 0.0
         pts[:, ID["RIGHT_WRIST"]] = (pts[:, ID["RIGHT_WRIST"]] * (1 - w[:, None])
                                      + at_string * w[:, None])
+
+    if flicker_s:
+        glitch = (t >= flicker_s[0]) & (t < flicker_s[1])
+        pts[glitch, ID["RIGHT_WRIST"]] = start_wrist
 
     sh_r = np.array(base["RIGHT_SHOULDER"])
     elbow_lift = 0.06 * anchor_p
@@ -164,12 +184,14 @@ def _vec_ease(x: np.ndarray) -> np.ndarray:
     return x ** 2 * (3 - 2 * x)
 
 
-def build_multi(n_shots: int = 3, seed: int = 11) -> tuple[pd.DataFrame, dict]:
+def build_multi(n_shots: int = 3, seed: int = 11, letdowns: tuple[int, ...] = ()
+                ) -> tuple[pd.DataFrame, dict]:
     """``n_shots`` consecutive shot cycles with slightly different noise per shot,
-    so cross-shot statistics have real (small) variation to measure."""
+    so cross-shot statistics have real (small) variation to measure. Cycles whose
+    0-based index is in ``letdowns`` end in a let-down instead of a release."""
     parts, per = [], None
     for k in range(n_shots):
-        df, truth = build(seed=seed + k, noise=0.0015 + 0.0004 * k)
+        df, truth = build(seed=seed + k, noise=0.0015 + 0.0004 * k, letdown=k in letdowns)
         per = truth["n_frames"]
         df = df.copy()
         df["frame"] = df["frame"] + k * per

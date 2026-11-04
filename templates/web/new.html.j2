@@ -49,7 +49,20 @@
              placeholder="measured anyway"></div>
     <div><label class="f" for="number_of_shots_expected">Shots expected</label>
       <input type="number" step="1" min="1" id="number_of_shots_expected" name="number_of_shots_expected"></div>
+    <div><label class="f" for="slow_motion_factor">Video speed</label>
+      <select id="slow_motion_factor" name="slow_motion_factor">
+        <option value="1" selected>Normal video</option>
+        <option value="2">Slow motion 2x</option>
+        <option value="4">Slow motion 4x</option>
+        <option value="8">Slow motion 8x</option>
+        <option value="16">Slow motion 16x</option>
+      </select></div>
   </div>
+  <p class="muted"><b>Video speed:</b> leave at <i>Normal video</i> unless the slow motion is part of
+  the file, e.g. a 30 fps clip shared from a phone where one real second plays for 4 or 8
+  seconds. Timings are then converted back to real time. A high-frame-rate original
+  (120 or 240 fps) is a normal video. Clips that switch between normal and slow
+  speed cannot be analysed correctly.</p>
   <label class="f" for="notes">Notes</label>
   <input type="text" id="notes" name="notes">
   <p class="muted">Session date is optional, but <b>compare</b> uses it to warn when the order

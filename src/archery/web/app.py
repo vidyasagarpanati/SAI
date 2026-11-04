@@ -301,14 +301,23 @@ def _session_from_form(form) -> tuple[dict, list[tuple[str, str]]]:
         value = (form.get(field) or "").strip()
         if value:
             session[field] = value
-    for field in ("age", "number_of_shots_expected"):
+    # Optional numbers: one that does not parse is left out, not an error.
+    for field, kind in (("age", int), ("number_of_shots_expected", int),
+                        ("camera_distance_m", float), ("declared_frame_rate", float)):
         raw = (form.get(field) or "").strip()
-        if raw:
-            session[field] = int(float(raw))
-    for field in ("camera_distance_m", "declared_frame_rate"):
-        raw = (form.get(field) or "").strip()
-        if raw:
-            session[field] = float(raw)
+        try:
+            if raw:
+                session[field] = kind(float(raw))
+        except ValueError:
+            pass
+    # Video speed: optional, Normal by default. Anything that is not a usable
+    # factor above 1 is a normal video, so the form can never stop a run.
+    try:
+        speed = float((form.get("slow_motion_factor") or "1").strip())
+    except ValueError:
+        speed = 1.0
+    if 1.0 < speed <= 32.0:
+        session["slow_motion_factor"] = speed
     gender = (form.get("gender") or "").strip()
     if gender:
         session["gender"] = gender

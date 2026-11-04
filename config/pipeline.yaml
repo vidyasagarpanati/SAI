@@ -16,6 +16,8 @@ frames:
   analysis_fps: 60          # decode target. Uses min(native_fps, analysis_fps).
   jpeg_quality: 92
   max_frames: 20000         # hard stop so a long video cannot fill the disk
+  slow_motion_min_decode_fps: 15  # slow-motion videos (session slow_motion_factor > 1)
+                            # decode at analysis_fps / factor, but never below this
 
 pose:
   num_poses: 1

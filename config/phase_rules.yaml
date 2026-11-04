@@ -9,7 +9,7 @@
 # "signal_summary" (percentiles of every driving signal on YOUR footage), and set
 # thresholds from those numbers. Do not tune by eye.
 
-version: 3
+version: 5
 
 shot_detection:
   anchor_distance_enter: 0.45     # draw wrist to mouth-corner midpoint, below this = anchored
@@ -19,6 +19,17 @@ shot_detection:
   release_search_before_s: 0.10   # release = draw-wrist speed peak within this window
   release_search_after_s: 0.15    #   around the end of the anchored run
   release_velocity_z: 3.0         # peak above mean + z*SD -> HIGH confidence, else MEDIUM
+  merge_anchor_gap_s: 0.50        # anchored runs split by less than this are one hold
+                                  # (tracking flicker), not two shots
+  # A SHOT is one unbroken sequence: hook and grip, setup, draw, anchor, aim,
+  # release, follow-through. A candidate missing any step listed here is not
+  # counted; it is listed under attempts_not_counted in 04_phases.json with
+  # what was missing. HOOK is read from wrists only (fingers are not tracked)
+  # and is not yet validated on real footage, so it is left out by default:
+  # add it once shot_cycle is tuned, or every shot it misses is dropped.
+  required_steps: [PRE_DRAW, DRAW, ANCHOR, AIM, RELEASE, FOLLOW_THROUGH]
+  require_release_spike: true     # release must reach the HIGH speed threshold above;
+                                  # a slow hand coming off the face is a let-down
 
 phases:
   pre_draw:
@@ -39,6 +50,8 @@ phases:
     window_after_s: 0.05
   follow_through:
     duration_after_release_s: 0.60
+    min_bow_arm_held_fraction: 0.60  # bow arm still up for this share of the window,
+                                  # else the follow-through is not seen
   recovery:
     bow_arm_drop_fraction: 0.15   # recovery ends when bow arm falls back below this fraction
     max_duration_s: 1.50
@@ -55,6 +68,16 @@ shot_cycle:
   hook_max_hand_speed: 0.5        # both wrists slower than this (shoulder widths/s)
   hook_min_hold_s: 0.30           # hands together at least this long
   hook_max_lead_s: 8.0            # hook-and-grip must end within this long before setup
+
+# Slow-motion videos (session slow_motion_factor above 1). S1 converts every
+# time back to real seconds, so the rules above hold as written. On top of that,
+# these widen the shot-detection windows, because the factor is an estimate
+# and the release is spread over many more frames. Scaled by window_scale:
+# release_search_before_s, release_search_after_s, merge_anchor_gap_s,
+# max_nan_gap_s, hook_max_lead_s. Not used for normal videos.
+slow_motion:
+  window_scale: 3.0
+  release_velocity_z: 2.5         # replaces shot_detection.release_velocity_z
 
 boundary_confidence:
   hysteresis_frames: 3            # tolerated noisy frames when walking a boundary, and the

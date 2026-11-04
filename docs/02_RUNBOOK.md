@@ -72,6 +72,30 @@ Version numbers increment. No report is ever overwritten.
 
 ---
 
+## Slow-motion videos
+
+Leave **Video speed** on the New analysis form at *Normal video* (session
+field `slow_motion_factor`, default 1) unless the slow motion is part of the
+file. Set it to 4x or 8x for a clip where one real second plays for 4 or 8
+seconds, typically a 30 fps clip shared from a phone.
+
+- **Timing:** S1 converts every time back to real seconds, once, so phase
+  times, shot time, the score and comparisons all use the same clock as normal
+  videos.
+- **Shot detection:** S4 also widens its shot-detection windows by
+  `slow_motion.window_scale` in `config/phase_rules.yaml`, because the factor
+  is an estimate.
+- **Annotated video:** it still plays slowly. The `t =` shown on each frame
+  and in the report is real time, so it reads lower than the player's clock by
+  the factor.
+- **High-frame-rate originals:** a 120 or 240 fps file is a *Normal video*.
+  Its frames already carry real time.
+- **Ramped clips:** a clip that switches between normal and slow speed cannot
+  be corrected with one factor. Trim it to the slow part, or use the original.
+- **Changing the factor:** S1 and everything after it run again. The frames
+  are decoded into their own folder, so frames decoded at another rate are
+  never reused.
+
 ## Tuning phase detection (S4)
 
 Thresholds live in `config/phase_rules.yaml`. Tune them from data, not by eye:
@@ -86,6 +110,26 @@ Thresholds live in `config/phase_rules.yaml`. Tune them from data, not by eye:
 
 A phase the signals cannot support is written as `detected: false` with a
 reason, never with a guessed boundary. `checks_S4.json` lists every one.
+
+### What counts as one shot
+
+A shot is one unbroken sequence: setup (bow arm rises), draw, anchor, aim, a
+real release (the draw hand snaps away fast), and follow-through (bow arm
+stays up). Every step named in `shot_detection.required_steps` must be seen.
+Anything less is not counted: a let-down, a hand passing the face, or a
+tracking flicker. These are listed under `attempts_not_counted` in
+`04_phases.json` with the step that was missing, and S4 warns about them.
+
+- **Too many shots:** the same hold is split in two, so raise
+  `merge_anchor_gap_s`.
+- **A real shot not counted:** read its `missing` entry in
+  `attempts_not_counted`.
+  - `RELEASE`: the speed spike was below `release_speed_threshold`, so lower
+    `release_velocity_z`.
+  - `FOLLOW_THROUGH`: lower `min_bow_arm_held_fraction`.
+- **Hook and grip:** add `HOOK` to `required_steps` once `shot_cycle` has
+  been tuned on your footage. It is left out by default because the camera
+  sees wrists, not fingers.
 
 ## Annotated outputs (S6, S7)
 

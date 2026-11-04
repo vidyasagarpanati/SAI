@@ -8,6 +8,14 @@ VERIFY frame count within tolerance of expectation, no zero-byte frames, first
 
 The video is decoded exactly once for the whole pipeline. S2, S6 and S7 all read
 these JPEGs, so a rerun of any later step never re-decodes.
+
+Slow motion. A clip with the slow motion baked in (a 30 fps file in which one
+real second lasts slow_motion_factor seconds) is turned back into real time
+here, once: analysis_fps is the REAL-time rate of the decoded frames,
+decode_fps * slow_motion_factor. Every later step measures real seconds and
+needs no change. decode_fps is the rate in the file's own time, which is what
+S7 plays the annotated video back at, so the slow motion is kept for viewing.
+A factor of 1 (the default) is a normal video and nothing changes.
 """
 from __future__ import annotations
 
@@ -21,6 +29,25 @@ from archery.io_guard import guarded_path
 from archery.steps.s00_ingest import _ffmpeg_exe
 
 FRAME_GLOB = "f*.jpg"
+MAX_SLOW_MOTION = 32.0
+
+
+def slow_motion_factor(session: dict) -> tuple[float, str | None]:
+    """How many seconds of video one real second lasts, and why it was ignored.
+
+    Optional, like every session field: absent, blank or unusable means a
+    normal video (1), with a reason to warn about, never a failed run."""
+    raw = session.get("slow_motion_factor")
+    if raw in (None, ""):
+        return 1.0, None
+    try:
+        f = float(raw)
+    except (TypeError, ValueError):
+        return 1.0, f"slow_motion_factor {raw!r} is not a number; treated as a normal video"
+    if not 1.0 <= f <= MAX_SLOW_MOTION:
+        return 1.0, (f"slow_motion_factor {f:g} is outside 1 to {MAX_SLOW_MOTION:g}; "
+                     f"treated as a normal video")
+    return f, None
 
 
 def _ffmpeg_quality(jpeg_quality: int) -> int:
@@ -36,11 +63,27 @@ def run(ctx: Context) -> StepResult:
 
     native_fps = float(ingest["measured_fps"] or 0)
     target_fps = float(ctx.cfg.get("frames.analysis_fps", 60))
-    analysis_fps = min(native_fps, target_fps) if native_fps else target_fps
+    factor, ignored = slow_motion_factor(ctx.session)
+    res.check("slow_motion_factor_usable", ignored is None,
+              ignored or (f"Slow motion x{factor:g}." if factor > 1 else "Normal video."),
+              severity=WARN)
+    if factor > 1:
+        # Real-time rate target_fps needs only target_fps / factor frames per
+        # second of video, so a long slow-motion clip stays under max_frames.
+        # The floor keeps the release snap sampled densely in real time.
+        floor = float(ctx.cfg.get("frames.slow_motion_min_decode_fps", 15))
+        decode_fps = max(target_fps / factor, floor)
+        decode_fps = min(native_fps, decode_fps) if native_fps else decode_fps
+    else:
+        decode_fps = min(native_fps, target_fps) if native_fps else target_fps
+    analysis_fps = decode_fps * factor
     duration = ingest["probe"].get("duration_s")
     max_frames = int(ctx.cfg.get("frames.max_frames", 20000))
 
-    frames_dir = guarded_path(ctx.frames_dir)
+    # Frames decoded at another rate must never be reused, so a slow-motion
+    # decode gets its own folder. Normal videos keep the original path.
+    frames_dir = guarded_path(ctx.frames_dir if factor == 1
+                              else ctx.frames_dir / f"slowmo_x{factor:g}")
     frames_dir.mkdir(parents=True, exist_ok=True)
 
     existing = sorted(frames_dir.glob(FRAME_GLOB))
@@ -48,7 +91,7 @@ def run(ctx: Context) -> StepResult:
         cmd = [
             _ffmpeg_exe(), "-hide_banner", "-loglevel", "error",
             "-i", str(video),
-            "-vf", f"fps={analysis_fps}",
+            "-vf", f"fps={decode_fps}",
             "-q:v", str(_ffmpeg_quality(ctx.cfg.get("frames.jpeg_quality", 92))),
             "-frames:v", str(max_frames),
             "-start_number", "0",
@@ -65,12 +108,15 @@ def run(ctx: Context) -> StepResult:
                   f"Reused {len(existing)} frames already decoded for this run.")
 
     n = len(existing)
-    res.check("frames_produced", n > 0, f"{n} frames at {analysis_fps:g} fps")
+    res.check("frames_produced", n > 0,
+              f"{n} frames at {decode_fps:g} fps" + (
+                  f" of video; slow motion x{factor:g}, so {analysis_fps:g} fps of real time"
+                  if factor > 1 else ""))
     if n == 0:
         return res
 
     if duration:
-        expected = min(int(round(duration * analysis_fps)), max_frames)
+        expected = min(int(round(duration * decode_fps)), max_frames)
         tolerance = max(2, int(0.02 * expected))
         res.check("frame_count_matches_duration", abs(n - expected) <= tolerance,
                   f"Got {n}, expected about {expected} (tolerance {tolerance}).",
@@ -108,15 +154,19 @@ def run(ctx: Context) -> StepResult:
         "frame_width": int(_w),
         "frame_height": int(_h),
         "analysis_fps": analysis_fps,
+        "decode_fps": decode_fps,
+        "slow_motion_factor": factor,
         "native_fps": native_fps,
         "frame_pattern": "f%06d.jpg",
         "first_frame": existing[0].name,
         "last_frame": existing[-1].name,
         "timestamps_s": None,
-        "note": "Frame i corresponds to t = i / analysis_fps seconds in the source.",
+        "note": ("Frame i is at t = i / analysis_fps seconds of REAL time, and at "
+                 "i / decode_fps seconds in the video file. They differ only for slow motion."),
     }
     out = ctx.write_json("01_frames.json", payload)
     res.outputs["frames_index"] = str(out)
     res.outputs["frames_dir"] = str(frames_dir)
-    res.stats = {"n_frames": n, "analysis_fps": analysis_fps}
+    res.stats = {"n_frames": n, "analysis_fps": analysis_fps, "decode_fps": decode_fps,
+                 "slow_motion_factor": factor}
     return res

@@ -82,6 +82,15 @@
       ],
       "description": "What the operator believes the capture rate was. The report always uses the MEASURED rate from S0 and flags any disagreement."
     },
+    "slow_motion_factor": {
+      "type": [
+        "number",
+        "string",
+        "null"
+      ],
+      "default": 1,
+      "description": "Leave at 1 for a normal video. For a clip with slow motion baked in, how many seconds of video one real second lasts (4 for 4x, 8 for 8x). All timings are converted back to real time. Not for clips that ramp between normal and slow speed. Optional: missing or unusable values are treated as 1 with a warning, never a failed run."
+    },
     "number_of_shots_expected": {
       "type": [
         "integer",

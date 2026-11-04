@@ -140,10 +140,17 @@ def normalise_session(raw: dict) -> tuple[dict, list[str]]:
 
 
 def validate_session(session: dict, schema_path: Path) -> list[str]:
+    return [msg for msg, _ in _schema_problems(session, schema_path)]
+
+
+def _schema_problems(session: dict, schema_path: Path) -> list[tuple[str, str | None]]:
+    """(message, offending top-level field) per schema problem. The field is
+    None for a problem that names no value, such as a field left out."""
     import jsonschema
     schema = json.loads(schema_path.read_text(encoding="utf-8"))
     validator = jsonschema.Draft202012Validator(schema)
-    return [f"{'/'.join(str(p) for p in e.path) or '<root>'}: {e.message}"
+    return [(f"{'/'.join(str(p) for p in e.path) or '<root>'}: {e.message}",
+             str(e.path[0]) if e.path else None)
             for e in validator.iter_errors(session)]
 
 
@@ -163,11 +170,19 @@ def run(ctx: Context) -> StepResult:
     digest = sha256_file(video)
     probe = probe_video(video)
 
-    schema_errors = validate_session(ctx.session, ctx.cfg.paths.schemas_dir / "session.schema.json")
-    res.check("session_schema_valid", not schema_errors,
-              "; ".join(schema_errors) or "session.json validates against the schema.")
+    # Every session field is optional: the run must never stop over the form.
+    # A field missing is filled with NOT PROVIDED below; a field with a value
+    # the schema rejects is set aside the same way, and both are warnings.
+    problems = _schema_problems(ctx.session, ctx.cfg.paths.schemas_dir / "session.schema.json")
+    set_aside = sorted({f for _, f in problems if f and f not in SP_OWNED})
+    res.check("session_schema_valid", not problems,
+              ("; ".join(m for m, _ in problems)
+               + (f". Not used, recorded as '{NOT_PROVIDED}': {set_aside}" if set_aside else ""))
+              if problems else "session.json validates against the schema.",
+              severity=WARN, evidence=set_aside)
 
-    session, missing = normalise_session(ctx.session)
+    session, missing = normalise_session({k: v for k, v in ctx.session.items()
+                                          if k not in set_aside})
     res.check("session_fields_present", not missing,
               f"Recorded as '{NOT_PROVIDED}': {missing}" if missing else "All session fields supplied.",
               severity=WARN, evidence=missing)

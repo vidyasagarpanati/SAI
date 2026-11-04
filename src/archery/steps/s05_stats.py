@@ -136,6 +136,7 @@ def run(ctx: Context) -> StepResult:
         "video_sha256": ingest["video_sha256"],
         "measured_fps": _r(ingest["measured_fps"], 3),
         "analysis_fps": fps,
+        "slow_motion_factor": float(phases.get("slow_motion_factor") or 1.0),
         "duration_s": _r(probe.get("duration_s"), 2),
         "resolution": f"{probe.get('width')}x{probe.get('height')}",
         "codec": probe.get("codec"),

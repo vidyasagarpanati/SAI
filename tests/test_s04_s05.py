@@ -93,19 +93,71 @@ def test_s4_is_deterministic(single):
     assert a == b
 
 
-def test_s4_undetectable_phase_is_reported_not_invented(tmp_path):
-    """Flatten the bow arm so it never rises: PRE_DRAW must be detected=false with a reason."""
+def _flat_bow_arm():
     df, truth = synthetic.build()
     from archery.landmarks import ID
     for j in ("LEFT_WRIST", "LEFT_ELBOW"):
         rows = df["lm"] == ID[j]
         df.loc[rows, "y"] = df.loc[rows, "y"].iloc[0] - 0.01
+    return df, truth
+
+
+def test_s4_undetectable_phase_is_reported_not_invented(tmp_path):
+    """Flatten the bow arm so it never rises: with setup not required, the shot
+    stays and PRE_DRAW must be detected=false with a reason."""
+    df, truth = _flat_bow_arm()
     ctx = make_run(tmp_path / "flat", df, truth["fps"])
+    ctx.cfg.phase_rules["shot_detection"]["required_steps"] = ["DRAW", "ANCHOR", "RELEASE"]
     s03_kinematics.run(ctx)
     s04_phases.run(ctx)
     ph, _ = phases_of(ctx)
     assert ph["PRE_DRAW"]["detected"] is False
     assert ph["PRE_DRAW"]["reason_not_detected"]
+
+
+def test_s4_a_shot_with_no_setup_is_not_counted(tmp_path):
+    """Default rules: no setup means the sequence broke, so no shot. The attempt
+    is listed with what was missing; S4 fails with that reason, not silence."""
+    df, truth = _flat_bow_arm()
+    ctx = make_run(tmp_path / "flat", df, truth["fps"])
+    s03_kinematics.run(ctx)
+    r4 = s04_phases.run(ctx)
+    _, p = phases_of_payload(ctx)
+    assert p["n_shots"] == 0
+    assert [a["missing"] for a in p["attempts_not_counted"]] == [["PRE_DRAW"]]
+    assert not r4.passed and "broke the sequence" in r4.failures[0].detail
+
+
+def phases_of_payload(ctx):
+    return None, json.loads((ctx.run_dir / "04_phases.json").read_text())
+
+
+def test_s4_tracking_flicker_mid_hold_is_one_shot(tmp_path):
+    """The wrist jumps off the face for 0.15 s during the hold. Before the fix
+    this was counted as two shots."""
+    df, truth = synthetic.build(flicker_s=(2.8, 2.95))
+    ctx = make_run(tmp_path / "flicker", df, truth["fps"])
+    s03_kinematics.run(ctx)
+    s04_phases.run(ctx)
+    _, p = phases_of_payload(ctx)
+    assert p["n_shots"] == 1, p["attempts_not_counted"]
+    assert 3.48 <= p["shots"][0]["release_t_s"] <= 3.62
+
+
+def test_s4_a_let_down_is_not_a_shot(tmp_path):
+    """Draw, anchor, then let down without shooting; then a real shot. One shot
+    counted, the let-down listed as an attempt with no release."""
+    df, truth = synthetic.build_multi(2, letdowns=(0,))
+    ctx = make_run(tmp_path / "letdown", df, truth["fps"])
+    s03_kinematics.run(ctx)
+    r4 = s04_phases.run(ctx)
+    _, p = phases_of_payload(ctx)
+    assert p["n_shots"] == 1
+    assert 8.48 <= p["shots"][0]["release_t_s"] <= 8.62
+    assert p["shots"][0]["shot"] == 1
+    (a,) = p["attempts_not_counted"]
+    assert a["anchor_t_s"] < 5.0 and "RELEASE" in a["missing"]
+    assert any(c.name == "incomplete_attempts_not_counted" and not c.ok for c in r4.checks)
 
 
 # ---------------------------------------------------------------- S5

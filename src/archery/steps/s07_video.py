@@ -70,6 +70,8 @@ def run(ctx: Context) -> StepResult:
     vdir.mkdir(parents=True, exist_ok=True)
     full = vdir / "annotated_full.mp4"
     n = len(fd.frames)
+    # Played back at the file's own rate: a slow-motion video stays slow.
+    play = fd.play_fps or fd.fps
 
     if ctx.cfg.get("video.render_full_annotated", True):
         first, _ = render(cv2.imread(str(fd.frames[0])), fd.pts[0], fd.vis[0], {},
@@ -77,7 +79,7 @@ def run(ctx: Context) -> StepResult:
                           mode="video", track_conf=track)
         H, W = first.shape[:2]
         cmd = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
-               "-f", "rawvideo", "-pix_fmt", "bgr24", "-s", f"{W}x{H}", "-r", repr(fd.fps), "-i", "-",
+               "-f", "rawvideo", "-pix_fmt", "bgr24", "-s", f"{W}x{H}", "-r", repr(play), "-i", "-",
                "-c:v", "libx264", "-preset", preset, "-crf", crf, "-pix_fmt", "yuv420p",
                "-movflags", "+faststart", str(full)]
         proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -116,8 +118,8 @@ def run(ctx: Context) -> StepResult:
                     continue
                 name = f"shot{sh['shot']}_p{p['badge']}_{p['phase']}.mp4"
                 dst = vdir / name
-                start = p["start_frame"] / fd.fps
-                dur = max((p["end_frame"] - p["start_frame"] + 1) / fd.fps, 1.0 / fd.fps)
+                start = p["start_frame"] / play
+                dur = max((p["end_frame"] - p["start_frame"] + 1) / play, 1.0 / play)
                 cmd = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-i", str(full),
                        "-ss", f"{start:.4f}", "-t", f"{dur:.4f}", "-c:v", "libx264",
                        "-preset", preset, "-crf", crf, "-pix_fmt", "yuv420p", "-an", str(dst)]
@@ -145,7 +147,8 @@ def run(ctx: Context) -> StepResult:
     res.outputs["published_video"] = str(published)
     res.outputs["clips_dir"] = str(vdir)
     ctx.write_json("07_video.json", {"full": str(full), "published": str(published),
-                                     "clips": clips, "fps": fd.fps, "frames": n,
+                                     "clips": clips, "fps": play, "real_time_fps": fd.fps,
+                                     "frames": n,
                                      "note": "Live angles are per-frame values from 03_kinematics, "
                                              "rounded; gated values render as n/a."})
     res.stats = {"frames": n, "clips": len(clips), "published": published.name}
