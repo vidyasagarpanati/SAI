@@ -30,8 +30,8 @@ def _ease(t: float) -> float:
 
 
 def build(seed: int = 7, noise: float = 0.0015, hook: bool = False,
-          letdown: bool = False, flicker_s: tuple[float, float] | None = None
-          ) -> tuple[pd.DataFrame, dict]:
+          letdown: bool = False, flicker_s: tuple[float, float] | None = None,
+          dropout_s: tuple[float, float] | None = None) -> tuple[pd.DataFrame, dict]:
     """``hook`` adds hooking and gripping: from 0.4 s to 1.0 s the draw hand rests
     on the string beside the bow hand, then rises with it into setup.
 
@@ -39,7 +39,10 @@ def build(seed: int = 7, noise: float = 0.0015, hook: bool = False,
     eases back off the face over a second with no snap, and the bow comes down.
 
     ``flicker_s`` throws the draw wrist off the face for that window during the
-    hold, the way a tracking glitch does, without the archer moving."""
+    hold, the way a tracking glitch does, without the archer moving.
+
+    ``dropout_s`` loses the draw hand for that window (visibility near zero),
+    the way a hand blurred or hidden behind the head is lost on real footage."""
     rng = np.random.default_rng(seed)
     n = int(FPS * DURATION_S)
     t = np.arange(n) / FPS
@@ -152,6 +155,10 @@ def build(seed: int = 7, noise: float = 0.0015, hook: bool = False,
     visibility = np.full((n, 33), 0.93)
     visibility[:, [ID["LEFT_EAR"]]] = 0.55        # far-side ear, partially occluded
     visibility[:, [ID["LEFT_FOOT_INDEX"]]] = 0.62
+    if dropout_s:
+        lost = (t >= dropout_s[0]) & (t < dropout_s[1])
+        for name in ("RIGHT_WRIST", "RIGHT_INDEX", "RIGHT_PINKY", "RIGHT_THUMB"):
+            visibility[lost, ID[name]] = 0.05
 
     frame_idx = np.repeat(np.arange(n, dtype=np.int32), 33)
     lm_idx = np.tile(np.arange(33, dtype=np.int16), n)

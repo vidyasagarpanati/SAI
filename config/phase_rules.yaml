@@ -9,7 +9,7 @@
 # "signal_summary" (percentiles of every driving signal on YOUR footage), and set
 # thresholds from those numbers. Do not tune by eye.
 
-version: 5
+version: 6
 
 shot_detection:
   anchor_distance_enter: 0.45     # draw wrist to mouth-corner midpoint, below this = anchored
@@ -19,8 +19,15 @@ shot_detection:
   release_search_before_s: 0.10   # release = draw-wrist speed peak within this window
   release_search_after_s: 0.15    #   around the end of the anchored run
   release_velocity_z: 3.0         # peak above mean + z*SD -> HIGH confidence, else MEDIUM
+  release_vs_draw_speed_ratio: 2.0  # ...or a peak this many times the shot's own draw
+                                  # speed (90th percentile) is also a real release. The
+                                  # clip-wide threshold alone misses releases in long
+                                  # clips, where walking and fetching arrows inflate it
   merge_anchor_gap_s: 0.50        # anchored runs split by less than this are one hold
                                   # (tracking flicker), not two shots
+  join_fragment_gap_s: 2.0        # a hold broken by a longer tracking loss: a piece with
+                                  # no release, then within this gap a piece with no draw
+                                  # of its own, is joined into one shot
   # A SHOT is one unbroken sequence: hook and grip, setup, draw, anchor, aim,
   # release, follow-through. A candidate missing any step listed here is not
   # counted; it is listed under attempts_not_counted in 04_phases.json with
@@ -28,7 +35,7 @@ shot_detection:
   # and is not yet validated on real footage, so it is left out by default:
   # add it once shot_cycle is tuned, or every shot it misses is dropped.
   required_steps: [PRE_DRAW, DRAW, ANCHOR, AIM, RELEASE, FOLLOW_THROUGH]
-  require_release_spike: true     # release must reach the HIGH speed threshold above;
+  require_release_spike: true     # release must pass one of the two speed tests above;
                                   # a slow hand coming off the face is a let-down
 
 phases:

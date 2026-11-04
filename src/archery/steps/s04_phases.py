@@ -12,7 +12,9 @@ How a shot is found (all thresholds in phase_rules.yaml):
   1. ANCHORED   draw wrist within anchor_distance_enter of the mouth, with
                 hysteresis up to anchor_distance_exit. Anchored runs split by a
                 gap shorter than merge_anchor_gap_s are one hold (tracking flicker)
-  2. RELEASE    draw-wrist speed peak near the end of each anchored run
+  2. RELEASE    draw-wrist speed peak near the end of each anchored run. It is
+                a real release when it clears the clip-wide threshold or is
+                release_vs_draw_speed_ratio times this shot's own draw speed
   3. DRAW       walking back from anchor while the anchor distance shrinks
   4. PRE_DRAW   walking back from draw while the bow arm is still rising
   5. STANCE     everything before that, back to the previous shot
@@ -28,8 +30,11 @@ How a shot is found (all thresholds in phase_rules.yaml):
                 shot_detection.required_steps. A broken sequence (a let-down, a
                 hand passing the face, a draw with no release) is recorded under
                 attempts_not_counted with what was missing, and its frames fall
-                to the next shot's window. Windows are rebuilt until every
-                remaining candidate is complete.
+                to the next shot's window. Two broken pieces, the first with no
+                release and the second with no draw of its own, less than
+                join_fragment_gap_s apart, are one hold split by a tracking loss
+                and are joined first. Windows are rebuilt until every remaining
+                candidate is complete.
 
 A phase the signals do not support is recorded as detected=false with the
 reason. It is never filled in with a guessed boundary.
@@ -147,6 +152,7 @@ def slow_motion_rules(rules: dict, factor: float) -> dict:
     for section, key in (("shot_detection", "release_search_before_s"),
                          ("shot_detection", "release_search_after_s"),
                          ("shot_detection", "merge_anchor_gap_s"),
+                         ("shot_detection", "join_fragment_gap_s"),
                          ("shot_detection", "max_nan_gap_s"),
                          ("shot_cycle", "hook_max_lead_s")):
         if key in (out.get(section) or {}):
@@ -201,8 +207,7 @@ def run(ctx: Context) -> StepResult:
     v_thresh = (float(v_finite.mean() + sd_["release_velocity_z"] * v_finite.std())
                 if v_finite.size else np.inf)
 
-    shots_raw = []
-    for s, e in anchored:
+    def candidate(s: int, e: int) -> dict:
         lo = max(s + 1, e - _frames(sd_["release_search_before_s"], fps))
         hi = min(n - 1, e + _frames(sd_["release_search_after_s"], fps))
         seg = V[lo:hi + 1]
@@ -211,9 +216,12 @@ def run(ctx: Context) -> StepResult:
             r_conf = "HIGH" if V[r] >= v_thresh else "MEDIUM"
         else:
             r, r_conf = min(e + 1, n - 1), "LOW"
-        shots_raw.append({"anchor_start": s, "anchor_run_end": e, "release": r,
-                          "release_conf": r_conf, "release_peak_speed": float(V[r])
-                          if np.isfinite(V[r]) else None})
+        return {"anchor_start": s, "anchor_run_end": e, "release": r,
+                "release_conf": r_conf, "release_peak_speed": float(V[r])
+                if np.isfinite(V[r]) else None}
+
+    shots_raw = [candidate(s, e) for s, e in anchored]
+    draw_ratio = sd_.get("release_vs_draw_speed_ratio")
 
     wb = _frames(ph["release"]["window_before_s"], fps)
     wa = _frames(ph["release"]["window_after_s"], fps)
@@ -241,6 +249,17 @@ def run(ctx: Context) -> StepResult:
                               "anchor distance never decreased at the required rate before anchoring"}
             if not draw_ok:
                 draw_start = s
+
+            # A release is the string snapping the hand away: much faster than
+            # this shot's own draw. A let-down eases off no faster than it drew.
+            # The global threshold alone fails on long clips, where walking and
+            # fetching arrows inflate the spread of hand speeds.
+            draw_v = V[draw_start:s]
+            draw_v = draw_v[np.isfinite(draw_v)]
+            peak = sh["release_peak_speed"]
+            draw_p90 = float(np.percentile(draw_v, 90)) if draw_ok and draw_v.size else None
+            spike = sh["release_conf"] == "HIGH" or bool(
+                draw_ratio and draw_p90 and peak is not None and peak >= draw_ratio * draw_p90)
 
             # ---- 4. PRE_DRAW: bow arm rising before the draw
             pre_seg = B[win_lo:draw_start + 1]
@@ -417,6 +436,8 @@ def run(ctx: Context) -> StepResult:
                 "release_confidence": sh["release_conf"],
                 "release_peak_draw_wrist_speed": (round(sh["release_peak_speed"], 3)
                                                   if sh["release_peak_speed"] is not None else None),
+                "draw_wrist_speed_p90_during_draw": round(draw_p90, 3) if draw_p90 else None,
+                "release_spike": spike or "RELEASE" in ov,
                 "window": [win_lo, win_hi],
                 "source": "manual+rules" if ov else "rules",
                 "cycle": cycle,
@@ -440,32 +461,52 @@ def run(ctx: Context) -> StepResult:
         if shot["cycle"]["start_event"] in ("HOOK_GRIP", "MANUAL"):
             found.add("HOOK")
         out = [code for code in required if code not in found]
-        if need_spike and shot["release_confidence"] not in ("HIGH", "MANUAL") \
-                and "RELEASE" not in out:
+        if need_spike and not shot["release_spike"] and "RELEASE" not in out:
             out.append("RELEASE")
         return out
 
-    def attempt(c: dict, missing: list[str], why: str) -> dict:
+    join_gap = _frames(sd_.get("join_fragment_gap_s") or 0.0, fps)
+
+    def join_fragments(cands: list[dict], shots: list[dict]) -> bool:
+        """One hold broken in two by a long tracking loss: the first piece has
+        no release, the second has no draw of its own (the archer never drew
+        again, so it is not a let-down and re-draw). Joined in place."""
+        for i in range(len(shots) - 1):
+            a, b = cands[i], cands[i + 1]
+            if (not shots[i]["release_spike"] and missing_steps(shots[i])
+                    and missing_steps(shots[i + 1])
+                    and "DRAW" not in shots[i + 1]["steps_seen"]
+                    and b["anchor_start"] - a["anchor_run_end"] - 1 <= join_gap):
+                cands[i:i + 2] = [candidate(a["anchor_start"], b["anchor_run_end"])]
+                return True
+        return False
+
+    def attempt(c: dict, shot: dict, missing: list[str], why: str) -> dict:
         return {"anchor_t_s": round(float(t[c["anchor_start"]]), 3),
                 "release_t_s": round(float(t[c["release"]]), 3),
                 "release_peak_draw_wrist_speed": (round(c["release_peak_speed"], 3)
                                                   if c["release_peak_speed"] is not None else None),
+                "draw_wrist_speed_p90_during_draw": shot["draw_wrist_speed_p90_during_draw"],
                 "missing": missing, "reason": why}
 
     # Rebuilt until stable: dropping a candidate widens its neighbours' windows,
-    # which can change what they find. Candidates only ever leave, so this ends.
+    # which can change what they find. Candidates only ever join or leave, so
+    # the list shrinks every pass and this ends.
     kept, attempts = list(shots_raw), []
     while True:
         shots = build(kept)
+        if join_gap and join_fragments(kept, shots):
+            continue
         bad = [i for i, sh in enumerate(shots) if missing_steps(sh)]
         if not bad:
             break
         for i in reversed(bad):
             miss = missing_steps(shots[i])
-            why = ("no release: draw-hand speed never spiked at the end of the hold"
+            why = ("no release: draw-hand speed at the end of the hold was no faster "
+                   "than a let-down"
                    if miss == ["RELEASE"] else
                    "sequence incomplete: " + ", ".join(DISPLAY.get(m, m) for m in miss) + " not seen")
-            attempts.append(attempt(kept.pop(i), miss, why))
+            attempts.append(attempt(kept.pop(i), shots[i], miss, why))
     attempts.sort(key=lambda a: a["anchor_t_s"])
 
     # ---- signal summary: the numbers to tune thresholds from ---------------

@@ -160,6 +160,39 @@ def test_s4_a_let_down_is_not_a_shot(tmp_path):
     assert any(c.name == "incomplete_attempts_not_counted" and not c.ok for c in r4.checks)
 
 
+def test_s4_hold_split_by_tracking_loss_is_one_shot(tmp_path):
+    """The draw hand is lost for 0.7 s mid-hold, longer than a flicker. The
+    first piece has no release and the second no draw of its own, so they are
+    one shot. Before the fix both were dropped and S4 failed with no shot."""
+    df, truth = synthetic.build(dropout_s=(2.6, 3.3))
+    ctx = make_run(tmp_path / "dropout", df, truth["fps"])
+    s03_kinematics.run(ctx)
+    r4 = s04_phases.run(ctx)
+    assert r4.passed, [f"{c.name}: {c.detail}" for c in r4.failures]
+    _, p = phases_of_payload(ctx)
+    assert p["signal_summary"]["anchored_runs_after_merge_and_hold"] == 2   # really split
+    assert p["n_shots"] == 1 and not p["attempts_not_counted"]
+    assert 3.45 <= p["shots"][0]["release_t_s"] <= 3.65
+
+
+def test_s4_release_counts_against_the_shots_own_draw_speed(tmp_path):
+    """On a long clip, walking and fetching arrows push the clip-wide speed
+    threshold above every release. A release several times faster than the
+    shot's own draw still counts; a let-down, no faster than the draw, still
+    does not."""
+    df, truth = synthetic.build_multi(2, letdowns=(0,))
+    ctx = make_run(tmp_path / "wide", df, truth["fps"])
+    ctx.cfg.phase_rules["shot_detection"]["release_velocity_z"] = 1e6   # never HIGH
+    s03_kinematics.run(ctx)
+    r4 = s04_phases.run(ctx)
+    assert r4.passed, [f"{c.name}: {c.detail}" for c in r4.failures]
+    _, p = phases_of_payload(ctx)
+    assert p["n_shots"] == 1 and 8.48 <= p["shots"][0]["release_t_s"] <= 8.62
+    assert p["shots"][0]["release_confidence"] == "MEDIUM" and p["shots"][0]["release_spike"]
+    (a,) = p["attempts_not_counted"]
+    assert a["anchor_t_s"] < 5.0 and "RELEASE" in a["missing"]
+
+
 # ---------------------------------------------------------------- S5
 def test_s5_passes_its_own_checks(single):
     *_, r5 = single
