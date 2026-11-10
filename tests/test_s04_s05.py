@@ -175,11 +175,10 @@ def test_s4_hold_split_by_tracking_loss_is_one_shot(tmp_path):
     assert 3.45 <= p["shots"][0]["release_t_s"] <= 3.65
 
 
-def test_s4_release_counts_against_the_shots_own_draw_speed(tmp_path):
+def test_s4_release_counts_against_the_still_hold(tmp_path):
     """On a long clip, walking and fetching arrows push the clip-wide speed
-    threshold above every release. A release several times faster than the
-    shot's own draw still counts; a let-down, no faster than the draw, still
-    does not."""
+    threshold above every release. A hand snapping away from a still hold
+    still counts; a let-down, easing off, still does not."""
     df, truth = synthetic.build_multi(2, letdowns=(0,))
     ctx = make_run(tmp_path / "wide", df, truth["fps"])
     ctx.cfg.phase_rules["shot_detection"]["release_velocity_z"] = 1e6   # never HIGH
@@ -191,6 +190,39 @@ def test_s4_release_counts_against_the_shots_own_draw_speed(tmp_path):
     assert p["shots"][0]["release_confidence"] == "MEDIUM" and p["shots"][0]["release_spike"]
     (a,) = p["attempts_not_counted"]
     assert a["anchor_t_s"] < 5.0 and "RELEASE" in a["missing"]
+
+
+def test_s4_soft_release_after_a_still_hold_is_a_shot(tmp_path):
+    """Real 24 fps footage: the release peak was ~2 shoulder widths/s, slower
+    than the draw and far below the clip-wide threshold, but ~100x the still
+    hold before it. Before the fix every shot on that clip was dropped."""
+    df, truth = synthetic.build(noise=0.0005, soft_release=True)
+    ctx = make_run(tmp_path / "soft", df, truth["fps"])
+    ctx.cfg.phase_rules["shot_detection"]["release_velocity_z"] = 1e6   # never HIGH
+    s03_kinematics.run(ctx)
+    r4 = s04_phases.run(ctx)
+    assert r4.passed, [f"{c.name}: {c.detail}" for c in r4.failures]
+    _, p = phases_of_payload(ctx)
+    (shot,) = p["shots"]
+    assert shot["release_spike"] and 3.5 <= shot["release_t_s"] <= 3.7
+    assert shot["release_peak_draw_wrist_speed"] < 10          # nothing like the 44 snap
+    assert shot["draw_wrist_speed_median_during_hold"] < 0.15
+
+
+def test_s4_hand_passing_the_face_is_not_a_release(tmp_path):
+    """Moving fast the whole time (no still hold): even a big peak is not a
+    release on its own merits. Real clip: hold ~1.0, peak ~2.5."""
+    df, truth = synthetic.build(noise=0.0005, soft_release=True)
+    ctx = make_run(tmp_path / "pass", df, truth["fps"])
+    sd = ctx.cfg.phase_rules["shot_detection"]
+    sd["release_velocity_z"] = 1e6
+    sd["release_hold_speed_floor"] = 1.0       # stands in for a hand that never stopped
+    s03_kinematics.run(ctx)
+    s04_phases.run(ctx)
+    _, p = phases_of_payload(ctx)
+    assert p["n_shots"] == 0
+    (a,) = p["attempts_not_counted"]
+    assert "RELEASE" in a["missing"]
 
 
 # ---------------------------------------------------------------- S5

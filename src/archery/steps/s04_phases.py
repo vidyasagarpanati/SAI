@@ -14,7 +14,7 @@ How a shot is found (all thresholds in phase_rules.yaml):
                 gap shorter than merge_anchor_gap_s are one hold (tracking flicker)
   2. RELEASE    draw-wrist speed peak near the end of each anchored run. It is
                 a real release when it clears the clip-wide threshold or is
-                release_vs_draw_speed_ratio times this shot's own draw speed
+                release_vs_hold_speed_ratio times the hand's speed during the hold
   3. DRAW       walking back from anchor while the anchor distance shrinks
   4. PRE_DRAW   walking back from draw while the bow arm is still rising
   5. STANCE     everything before that, back to the previous shot
@@ -216,12 +216,26 @@ def run(ctx: Context) -> StepResult:
             r_conf = "HIGH" if V[r] >= v_thresh else "MEDIUM"
         else:
             r, r_conf = min(e + 1, n - 1), "LOW"
+        peak = float(V[r]) if np.isfinite(V[r]) else None
+        # A release is a still hand snapping away. Judged against the hold just
+        # before it, not the whole clip: on long clips walking and fetching
+        # arrows inflate the clip-wide spread, and at low frame rates smoothing
+        # flattens the peak below a fast draw. A let-down eases off; a hand
+        # passing the face was never still.
+        hold = V[max(s, r - hold_n):max(s, r - _frames(sd_["release_search_before_s"], fps))]
+        hold = hold[np.isfinite(hold)]
+        hold_med = float(np.median(hold)) if hold.size else None
+        spike = r_conf == "HIGH" or bool(
+            hold_ratio and hold_med is not None and peak is not None
+            and peak >= hold_ratio * max(hold_med, hold_floor))
         return {"anchor_start": s, "anchor_run_end": e, "release": r,
-                "release_conf": r_conf, "release_peak_speed": float(V[r])
-                if np.isfinite(V[r]) else None}
+                "release_conf": r_conf, "release_peak_speed": peak,
+                "hold_speed_median": hold_med, "release_spike": spike}
 
+    hold_ratio = sd_.get("release_vs_hold_speed_ratio")
+    hold_floor = float(sd_.get("release_hold_speed_floor") or 0.0)
+    hold_n = _frames(sd_.get("release_hold_window_s") or 1.0, fps)
     shots_raw = [candidate(s, e) for s, e in anchored]
-    draw_ratio = sd_.get("release_vs_draw_speed_ratio")
 
     wb = _frames(ph["release"]["window_before_s"], fps)
     wa = _frames(ph["release"]["window_after_s"], fps)
@@ -249,17 +263,6 @@ def run(ctx: Context) -> StepResult:
                               "anchor distance never decreased at the required rate before anchoring"}
             if not draw_ok:
                 draw_start = s
-
-            # A release is the string snapping the hand away: much faster than
-            # this shot's own draw. A let-down eases off no faster than it drew.
-            # The global threshold alone fails on long clips, where walking and
-            # fetching arrows inflate the spread of hand speeds.
-            draw_v = V[draw_start:s]
-            draw_v = draw_v[np.isfinite(draw_v)]
-            peak = sh["release_peak_speed"]
-            draw_p90 = float(np.percentile(draw_v, 90)) if draw_ok and draw_v.size else None
-            spike = sh["release_conf"] == "HIGH" or bool(
-                draw_ratio and draw_p90 and peak is not None and peak >= draw_ratio * draw_p90)
 
             # ---- 4. PRE_DRAW: bow arm rising before the draw
             pre_seg = B[win_lo:draw_start + 1]
@@ -436,8 +439,9 @@ def run(ctx: Context) -> StepResult:
                 "release_confidence": sh["release_conf"],
                 "release_peak_draw_wrist_speed": (round(sh["release_peak_speed"], 3)
                                                   if sh["release_peak_speed"] is not None else None),
-                "draw_wrist_speed_p90_during_draw": round(draw_p90, 3) if draw_p90 else None,
-                "release_spike": spike or "RELEASE" in ov,
+                "draw_wrist_speed_median_during_hold": (round(sh["hold_speed_median"], 3)
+                                                        if sh["hold_speed_median"] is not None else None),
+                "release_spike": sh["release_spike"] or "RELEASE" in ov,
                 "window": [win_lo, win_hi],
                 "source": "manual+rules" if ov else "rules",
                 "cycle": cycle,
@@ -486,7 +490,7 @@ def run(ctx: Context) -> StepResult:
                 "release_t_s": round(float(t[c["release"]]), 3),
                 "release_peak_draw_wrist_speed": (round(c["release_peak_speed"], 3)
                                                   if c["release_peak_speed"] is not None else None),
-                "draw_wrist_speed_p90_during_draw": shot["draw_wrist_speed_p90_during_draw"],
+                "draw_wrist_speed_median_during_hold": shot["draw_wrist_speed_median_during_hold"],
                 "missing": missing, "reason": why}
 
     # Rebuilt until stable: dropping a candidate widens its neighbours' windows,
@@ -502,8 +506,7 @@ def run(ctx: Context) -> StepResult:
             break
         for i in reversed(bad):
             miss = missing_steps(shots[i])
-            why = ("no release: draw-hand speed at the end of the hold was no faster "
-                   "than a let-down"
+            why = ("no release: the draw hand did not snap away from a still hold"
                    if miss == ["RELEASE"] else
                    "sequence incomplete: " + ", ".join(DISPLAY.get(m, m) for m in miss) + " not seen")
             attempts.append(attempt(kept.pop(i), shots[i], miss, why))

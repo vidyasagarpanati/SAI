@@ -19,10 +19,15 @@ shot_detection:
   release_search_before_s: 0.10   # release = draw-wrist speed peak within this window
   release_search_after_s: 0.15    #   around the end of the anchored run
   release_velocity_z: 3.0         # peak above mean + z*SD -> HIGH confidence, else MEDIUM
-  release_vs_draw_speed_ratio: 2.0  # ...or a peak this many times the shot's own draw
-                                  # speed (90th percentile) is also a real release. The
-                                  # clip-wide threshold alone misses releases in long
-                                  # clips, where walking and fetching arrows inflate it
+  release_vs_hold_speed_ratio: 15.0  # ...or a peak this many times the hand's median speed
+                                  # over the last release_hold_window_s of the hold is
+                                  # also a real release: a still hand snapping away. The
+                                  # clip-wide threshold alone misses releases in long or
+                                  # low-frame-rate clips. Measured on real 24 fps footage:
+                                  # releases ~100x, a hand passing the face ~2-3x
+  release_hold_window_s: 1.0
+  release_hold_speed_floor: 0.05  # hold speeds below this count as this, so a perfectly
+                                  # still hold does not let any small movement through
   merge_anchor_gap_s: 0.50        # anchored runs split by less than this are one hold
                                   # (tracking flicker), not two shots
   join_fragment_gap_s: 2.0        # a hold broken by a longer tracking loss: a piece with

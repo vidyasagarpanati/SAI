@@ -121,8 +121,9 @@ tracking flicker. These are listed under `attempts_not_counted` in
 `04_phases.json` with the step that was missing, and S4 warns about them.
 
 A release counts when the draw-hand speed peak clears the clip-wide
-threshold, or is `release_vs_draw_speed_ratio` times the shot's own draw speed.
-On long clips the clip-wide test alone misses releases. A hold broken by a
+threshold, or is `release_vs_hold_speed_ratio` times the hand's speed during
+the hold. On long or low-frame-rate clips the clip-wide test alone misses
+releases. A hold broken by a
 tracking loss longer than a flicker is joined back into one shot when the first
 piece has no release, the second piece has no draw of its own, and the two are
 less than `join_fragment_gap_s` apart.
@@ -132,8 +133,8 @@ less than `join_fragment_gap_s` apart.
 - **A real shot not counted:** read its `missing` entry in
   `attempts_not_counted`.
   - `RELEASE`: compare `release_peak_draw_wrist_speed` with
-    `draw_wrist_speed_p90_during_draw` on the attempt, then lower
-    `release_vs_draw_speed_ratio`.
+    `draw_wrist_speed_median_during_hold` on the attempt, then lower
+    `release_vs_hold_speed_ratio`.
   - Pieces of one shot listed side by side, about a second apart: raise
     `join_fragment_gap_s`.
   - `FOLLOW_THROUGH`: lower `min_bow_arm_held_fraction`.

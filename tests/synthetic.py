@@ -31,7 +31,8 @@ def _ease(t: float) -> float:
 
 def build(seed: int = 7, noise: float = 0.0015, hook: bool = False,
           letdown: bool = False, flicker_s: tuple[float, float] | None = None,
-          dropout_s: tuple[float, float] | None = None) -> tuple[pd.DataFrame, dict]:
+          dropout_s: tuple[float, float] | None = None, soft_release: bool = False
+          ) -> tuple[pd.DataFrame, dict]:
     """``hook`` adds hooking and gripping: from 0.4 s to 1.0 s the draw hand rests
     on the string beside the bow hand, then rises with it into setup.
 
@@ -42,7 +43,11 @@ def build(seed: int = 7, noise: float = 0.0015, hook: bool = False,
     hold, the way a tracking glitch does, without the archer moving.
 
     ``dropout_s`` loses the draw hand for that window (visibility near zero),
-    the way a hand blurred or hidden behind the head is lost on real footage."""
+    the way a hand blurred or hidden behind the head is lost on real footage.
+
+    ``soft_release`` is the release as a smoothed low-frame-rate clip shows it:
+    from a still hold the hand moves a short way back along the jaw and stays
+    there, a peak far below the snapping release above."""
     rng = np.random.default_rng(seed)
     n = int(FPS * DURATION_S)
     t = np.arange(n) / FPS
@@ -101,6 +106,8 @@ def build(seed: int = 7, noise: float = 0.0015, hook: bool = False,
             anchor_p[i] = 1.0
         elif letdown:
             anchor_p[i] = 1.0 - _ease((ti - 3.5) / 1.0)
+        elif soft_release:
+            anchor_p[i] = 1.0 - 0.45 * _ease((ti - 3.5) / 0.25)
         elif ti < 3.6:
             anchor_p[i] = 1.0 - _ease((ti - 3.5) / 0.1) * 1.6
         else:
